@@ -37,7 +37,6 @@ LENV="${BIN_DIR}/lenv"
 #
 PERL=$(which perl) || { echo "command perl not found" >&2; exit 1; }
 CURL=$(which curl) || { echo "command curl not found" >&2; exit 1; }
-WGET=$(which wget) || { echo "command wget not found" >&2; exit 1; }
 TAR=$(which tar) || { echo "command tar not found" >&2; exit 1; }
 
 
@@ -207,7 +206,7 @@ function _listInstalled() {
 
     for dir in $dirs; do
         # extract version number
-        ver=$(perl -e "print( \"${dir}\" =~ /.*\/([0-9]+(\.[0-9]+)*)$/ && \$1)")
+        ver=$($PERL -e "print( \"${dir}\" =~ /.*\/([0-9]+(\.[0-9]+)*)$/ && \$1)")
         if [ -d $dir ] && [ -n "$ver" ]; then
             echo $ver
         fi
@@ -334,7 +333,7 @@ function cmdUninstall() {
     
     for dir in ${dirs}; do
         # extract version number
-        ver=$(perl -e "print( \"${dir}\" =~ /.*\/([0-9]+(\.[0-9]+)*)$/ && \$1)")
+        ver=$($PERL -e "print( \"${dir}\" =~ /.*\/([0-9]+(\.[0-9]+)*)$/ && \$1)")
         if [ -d $dir ] && [ "x${ver}" = "x${target}" ]; then
             echo "uninstall ${dir}"
             rm -rf ${dir}
