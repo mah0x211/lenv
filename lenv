@@ -89,7 +89,7 @@ function _setup() {
 export PATH=${BIN_DIR}:${CURRENT_DIR}/bin:\$PATH
 # export LUA_PATH and LUA_CPATH
 if [ -f ${CURRENT_DIR}/bin/luarocks ]; then
-    ${CURRENT_DIR}/bin/luarocks path
+    \$(${CURRENT_DIR}/bin/luarocks path)
 fi
 
 
