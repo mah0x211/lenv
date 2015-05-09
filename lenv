@@ -48,18 +48,18 @@ function cmdUsage() {
 lenv ${VERSION}
 
 Usage:
-    lenv help                   Show this message
-    lenv fetch                  Fetch remote versions
-    lenv vers                   List available versions
-    lenv ls                     List installed versions
-    lenv install <version>      Download and install a <version> of lua with
-                                luarocks
-    lenv install-lj <version>   Download and install a <version> of luajit with
-                                luarocks
-    lenv uninstall <version>    Uninstall a <version> of lua
-    lenv uninstall-lj <version> Uninstall a <version> of luajit
-    lenv use <version>          Use a <version> of lua
-    lenv use-lj <version>       Use a <version> of luajit
+    lenv help                           Show this message
+    lenv fetch                          Fetch remote versions
+    lenv vers                           List available versions
+    lenv ls                             List installed versions
+    lenv install <version> <opt...>     Download and install a <version> of lua
+                                        with luarocks
+    lenv install-lj <version> <opt...>  Download and install a <version> of 
+                                        luajit with luarocks
+    lenv uninstall <version>            Uninstall a <version> of lua
+    lenv uninstall-lj <version>         Uninstall a <version> of luajit
+    lenv use <version>                  Use a <version> of lua
+    lenv use-lj <version>               Use a <version> of luajit
 
 _EOS_
 
