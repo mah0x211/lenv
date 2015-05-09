@@ -87,11 +87,6 @@ function _setup() {
 # please add the following lenv settings to your environment
 #
 export PATH=${BIN_DIR}:${CURRENT_DIR}/bin:\$PATH
-# export LUA_PATH and LUA_CPATH
-if [ -f ${CURRENT_DIR}/bin/luarocks ]; then
-    \$(${CURRENT_DIR}/bin/luarocks path)
-fi
-
 
 _EOS_
 
@@ -352,7 +347,6 @@ function cmdUninstall() {
 function cmdUse() {
     local dir=$1
     local ver=$2
-    local tmpdir
     
     if ! [ -d ${dir} ]; then
         echo "version ${ver} not installed"
