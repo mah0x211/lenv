@@ -87,6 +87,9 @@ function _setup() {
 # please add the following lenv settings to your environment
 #
 export PATH=${BIN_DIR}:${CURRENT_DIR}/bin:\$PATH
+export LUA_PATH='${CURRENT_DIR}/luarocks/share/?.lua;${CURRENT_DIR}/luarocks/share/?/init.lua;;'
+export LUA_CPATH='${CURRENT_DIR}/luarocks/lib/?.so;;'
+
 
 _EOS_
 
@@ -257,6 +260,38 @@ function _installRocks() {
     make bootstrap
     cd ../
     rm -rf ${ary[2]}
+    
+    # create symbolic link
+    echo 'create symbolic links...'
+    cd ${path}
+    regex="${path}/(share|lib)/([^?]+)/"
+    script=$(cat << _EOS_
+        my \$line = <STDIN>;
+        my \$regex = "${regex}";
+        
+        if( \$line =~ /LUA_C?PATH='(.+)'/ )
+        {
+            my @arr = split( /;/, \$1 );
+            
+            foreach ( @arr )
+            {
+                if( \$_ =~ \$regex ){
+                    my \$dir = "${path}/\$1/\$2";
+                    my \$dst = "${path}/luarocks/\$1";
+                    
+                    print "ln -s \$dir, \$dst\n";
+                    if( -e \$dst ){
+                        unlink \$dst or die \$!;
+                    }
+                    symlink \$dir, \$dst or die \$!;
+                }
+            }
+        }
+_EOS_)
+
+    command luarocks path | while read line; do
+        echo "${line}" | perl -e "${script}"
+    done
 }
 
 
@@ -310,6 +345,7 @@ function cmdInstall() {
             fi
             
             _installRocks ${ver} ${path}
+            
             exit
         fi
     done < $1
@@ -358,6 +394,7 @@ function cmdUse() {
     if [ -L ${CURRENT_DIR} ]; then
         rm ${CURRENT_DIR}
     fi
+    
     # create new symbolic link
     ln -s ${dir} ${CURRENT_DIR}
 }
