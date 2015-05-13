@@ -289,7 +289,7 @@ function _installRocks() {
         }
 _EOS_)
 
-    command luarocks path | while read line; do
+    command bin/luarocks path | while read line; do
         echo "${line}" | perl -e "${script}"
     done
 }
