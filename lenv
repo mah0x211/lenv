@@ -49,6 +49,7 @@ lenv ${VERSION}
 
 Usage:
     lenv help                           Show this message
+    lenv update                         Update lenv
     lenv fetch                          Fetch remote versions
     lenv vers                           List available versions
     lenv ls                             List installed versions
@@ -70,7 +71,7 @@ _EOS_
 #
 # setup
 #
-function _setup() {
+function cmdUpdate() {
     # check directory existence
     for dir in $LENV_DIR $BIN_DIR $SRC_DIR $LUA_DIR $LUAJIT_DIR $TMP_DIR; do
         if ! [ -d $dir ]; then
@@ -97,7 +98,7 @@ _EOS_
 }
 
 if ! [ -f ${LENV} ]; then
-    _setup
+    cmdUpdate
 fi
 
 
@@ -406,6 +407,8 @@ function cmdUse() {
 case $1 in
     "help" )
         cmdUsage ;;
+    "update" )
+        cmdUpdate ;;
     "fetch" )
         cmdFetch ;;
     "vers" )
