@@ -49,6 +49,7 @@ lenv ${VERSION}
 
 Usage:
     lenv help                           Show this message
+    lenv path                           Show the configured paths
     lenv update                         Update lenv
     lenv fetch                          Fetch remote versions
     lenv vers                           List available versions
@@ -69,6 +70,25 @@ _EOS_
 
 
 #
+# show paths
+#
+function cmdPath() {
+
+    cat << _EOS_
+#
+# please add the following lenv settings to your environment
+#
+export PATH=${BIN_DIR}:${CURRENT_DIR}/bin:\$PATH
+export LUA_PATH='${CURRENT_DIR}/luarocks/share/?.lua;${CURRENT_DIR}/luarocks/share/?/init.lua;;'
+export LUA_CPATH='${CURRENT_DIR}/luarocks/lib/?.so;;'
+
+
+_EOS_
+
+}
+
+
+#
 # setup
 #
 function cmdUpdate() {
@@ -82,23 +102,13 @@ function cmdUpdate() {
     # fetch lenv
     $CURL -L --compressed 'http://git.io/lenv' > "${LENV}"
     chmod +x ${LENV}
-
-    cat << _EOS_
-#
-# please add the following lenv settings to your environment
-#
-export PATH=${BIN_DIR}:${CURRENT_DIR}/bin:\$PATH
-export LUA_PATH='${CURRENT_DIR}/luarocks/share/?.lua;${CURRENT_DIR}/luarocks/share/?/init.lua;;'
-export LUA_CPATH='${CURRENT_DIR}/luarocks/lib/?.so;;'
-
-
-_EOS_
-
-    exit
+    
+    cmdPath
 }
 
 if ! [ -f ${LENV} ]; then
     cmdUpdate
+    exit
 fi
 
 
@@ -407,6 +417,8 @@ function cmdUse() {
 case $1 in
     "help" )
         cmdUsage ;;
+    "path" )
+        cmdPath ;;
     "update" )
         cmdUpdate ;;
     "fetch" )
