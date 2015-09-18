@@ -289,7 +289,7 @@ function _installRocks() {
     
     # compile and install
     cd ${ary[2]}
-    ./configure --prefix=${path} --sysconfdir=${path}/luarocks --with-lua=${path} --with-lua-bin=${path}/bin --with-lua-include=${path}/include --with-lua-lib=${path}/lib --force-config
+    ./configure --prefix=${path} --sysconfdir=${path}/luarocks --with-lua=${path} --with-lua-bin=${path}/bin --with-lua-include=${path}/include --with-lua-lib=${path}/lib
     make bootstrap
     cd ../
     rm -rf ${ary[2]}
