@@ -25,9 +25,6 @@ use strict;
 use encoding "utf8";
 use open ":encoding(utf8)";
 
-#set -e
-#set -x
-
 my $VERSION = '0.1.0';
 
 #
@@ -555,7 +552,7 @@ sub cmdUpdate
     # fetch lenv
     shcall( "$CURL -L --compressed 'http://git.io/lenv' > ${LENV}" );
     shcall( "chmod +x ${LENV}" );
-    shcall( "${LENV} > ~/.lenvrc" );
+    shcall( "${LENV} path > ~/.lenvrc" );
 }
 
 
