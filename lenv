@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/env perl
 #
 #  Copyright (C) 2015 Masatoshi Teruya
 #
@@ -21,52 +21,619 @@
 #  THE SOFTWARE.
 #
 
+use strict;
+use encoding "utf8";
+use open ":encoding(utf8)";
 
-set -e
+#set -e
 #set -x
 
-ARGV=$@
-VERSION=0.1.0
+my $VERSION = '0.1.0';
 
 #
 # directories
 #
-LENV_DIR="${HOME}/.lenv"
-BIN_DIR="${LENV_DIR}/bin"
-SRC_DIR="${LENV_DIR}/src"
-TMP_DIR="${LENV_DIR}/tmp"
-LUA_DIR="${LENV_DIR}/lua"
-LUAJIT_DIR="${LENV_DIR}/luajit"
-CURRENT_DIR="${LENV_DIR}/current"
+my $LENV_DIR    = "$ENV{HOME}/.lenv";
+my $BIN_DIR     = "$LENV_DIR/bin";
+my $SRC_DIR     = "$LENV_DIR/src";
+my $TMP_DIR     = "$LENV_DIR/tmp";
+my $LUA_DIR     = "$LENV_DIR/lua";
+my $LUAJIT_DIR  = "$LENV_DIR/luajit";
+my $CURRENT_DIR = "$LENV_DIR/current";
+
 
 #
 # version files for lua, luajit, luarocks
 #
-LUA_VERS_HTML="${TMP_DIR}/lua_vers.html"
-LUA_VERS_TXT="${LENV_DIR}/lua_vers.txt"
-LUAJIT_VERS_HTML="${TMP_DIR}/luajit_vers.html"
-LUAJIT_VERS_TXT="${LENV_DIR}/luajit_vers.txt"
-ROCKS_VERS_HTML="${TMP_DIR}/rocks_vers.html"
-ROCKS_VERS_TXT="${LENV_DIR}/rocks_vers.txt"
+my $LUA_VERS_TXT    = "$LENV_DIR/lua_vers.txt";
+my $LUAJIT_VERS_TXT = "$LENV_DIR/luajit_vers.txt";
+my $ROCKS_VERS_TXT  = "$LENV_DIR/rocks_vers.txt";
+
 
 #
 # lenv path
 #
-LENV="${BIN_DIR}/lenv"
+my $LENV="$BIN_DIR/lenv";
+
 
 #
 # required commands
 #
-PERL=$(which perl) || { echo "command perl not found" >&2; exit 1; }
-CURL=$(which curl) || { echo "command curl not found" >&2; exit 1; }
-TAR=$(which tar) || { echo "command tar not found" >&2; exit 1; }
+my $CURL = `which curl` or die "command curl not found";
+chomp($CURL);
+
+my $TAR = `which tar` or die "command tar not found";
+chomp($TAR);
+
+my $OPENSSL = `which openssl` or die "command openssl not found";
+chomp($OPENSSL);
+
+
+#
+# helper functions
+#
+sub shcall
+{
+    foreach( @_ ){
+        die $! if system( "sh -x -e -c '$_'" );
+    }
+}
+
+
+#
+# use
+#
+sub cmdUse
+{
+    my ( $dir, $ver ) = @_;
+
+    die "invalid version number $ver" if $ver !~ /\d+(.\d+)*$/;
+    die "version $ver not installed" if !-d $dir;
+    chdir $LENV_DIR or die $!;
+
+    # remove current symbolic link
+    if( -l $CURRENT_DIR ){
+        unlink $CURRENT_DIR or die "failed to unlink $!";
+    }
+
+    # create new symbolic link
+    symlink $dir, $CURRENT_DIR or die "failed to symlink: $!";
+}
+
+
+sub cmdUseLua
+{
+    my $ver = shift @ARGV;
+    cmdUse( "$LUA_DIR/$ver", $ver );
+}
+
+
+sub cmdUseLuaJIT
+{
+    my $ver = shift @ARGV;
+    cmdUse( "$LUAJIT_DIR/$ver", $ver );
+}
+
+
+#
+# install
+#
+sub extract
+{
+    my $src = shift;
+    my $dir;
+    my @list;
+
+    shcall( "mkdir -p $TMP_DIR" );
+
+    # cleanup dir
+    opendir( my $dh, $TMP_DIR ) or die $!;
+    @list = grep( /[^.]/, readdir( $dh ) );
+    foreach( @list ){
+        shcall( "rm -rf $TMP_DIR/$_" );
+    }
+    closedir( $dh );
+
+    # extract
+    shcall( "$TAR xzf $src -C $TMP_DIR" );
+
+    # find dir
+    opendir( my $dh, $TMP_DIR ) or die $!;
+    @list = grep( /[^.]/, readdir( $dh ) );
+    foreach( @list ){
+        $dir = "$TMP_DIR/$_";
+        last;
+    }
+    closedir( $dh );
+
+    return $dir;
+}
+
+
+sub download
+{
+    my ( $ver, $url, $file, $checksum ) = @_;
+    my $src = "$SRC_DIR/$file";
+    my $sum;
+
+    # download if not exists
+    if( !-f $src ){
+        shcall( "$CURL -o $src -L $url" );
+    }
+
+    # verify checksum
+    if( $checksum ){
+        $sum = `$OPENSSL md5 -r $src`;
+        chomp( $sum );
+        die "checksum of $file does not match $checksum" if $sum !~ /^$checksum/;
+    }
+
+    return $src;
+}
+
+
+sub getVerLine
+{
+    my ( $txt, $ver ) = @_;
+    my @arr;
+
+    chdir $SRC_DIR or die "failed to chdir $SRC_DIR - $!";
+
+    # parse version files
+    open( my $fh, $txt ) or die "could not open $txt: $!";
+    while( <$fh> )
+    {
+        @arr = split( /\s/, $_ );
+        if( $ver eq 'latest' or $arr[0] eq $ver ){
+            last;
+        }
+        undef @arr;
+    }
+    close( $fh );
+
+    return @arr;
+}
+
+
+#
+# compile and install LuaRocks
+#
+sub installRocks
+{
+    my $instpath = shift;
+    my @line = getVerLine( $ROCKS_VERS_TXT, 'latest' ) or die "version 'latest' not found";
+    my $dest = extract( download( @line ) );
+    my $installer = "$TMP_DIR/install.sh";
+    my $args = join( ' ', @ARGV );
+    my $regex = "${instpath}/(share|lib)/([^?]+)/";
+    my ( $fh, $lpath );
+
+    # parse version files
+    open( $fh, '>', $installer ) or die "could not open $installer: $!";
+
+    print $fh <<_EOS_;
+#
+# compile and install
+#
+
+set -x
+set -e
+
+rm -f ${installer}
+cd ${dest}
+
+./configure --prefix=${instpath} \\
+    --sysconfdir=${instpath}/luarocks \\
+    --with-lua=${instpath} \\
+    --with-lua-bin=${instpath}/bin \\
+    --with-lua-include=${instpath}/include \\
+    --with-lua-lib=${instpath}/lib
+
+make build
+make bootstrap
+
+rm -rf ${dest}
+
+_EOS_
+
+    close( $fh );
+    shcall("sh $installer");
+
+    # create symbolic link
+    chdir $instpath or die $!;
+    $lpath = `bin/luarocks path` or die $!;
+
+    foreach( split( /\n/, $lpath ) )
+    {
+        if( $_ =~ /LUA_C?PATH='(.+)'/ )
+        {
+            my @arr = split( /;/, $1 );
+            
+            foreach( @arr )
+            {
+                if( $_ =~ $regex ){
+                    my $dir = "${instpath}/$1/$2";
+                    my $dst = "${instpath}/luarocks/$1";
+                    
+                    print "ln -s $dir, $dst\n";
+                    if( -e $dst ){
+                        unlink $dst or die $!;
+                    }
+                    symlink $dir, $dst or die $!;
+                }
+            }
+        }
+    }
+}
+
+
+sub cmdInstall
+{
+    my ( $txt, $ver, $instpath, $prefix, $postflight ) = @_;
+    my @line = getVerLine( $txt, $ver ) or die "version $ver not found";
+    my $dest = extract( download( @line ) );
+    my $installer = "$TMP_DIR/install.sh";
+    my $args = join( ' ', @ARGV );
+    my $fh;
+
+    # parse version files
+    open( $fh, '>', $installer ) or die "could not open $installer: $!";
+
+    print $fh <<_EOS_;
+#
+# compile and install
+#
+
+set -x
+set -e
+
+rm -f ${installer}
+cd ${dest}
+make ${args}
+rm -rf ${instpath}
+make install ${prefix}
+rm -rf ${dest}
+
+${postflight}
+
+_EOS_
+
+    close( $fh );
+    shcall("sh $installer");
+
+    installRocks( $instpath );
+}
+
+
+sub getPlatform
+{
+    # aix ansi bsd generic linux macosx mingw posix solaris
+    my $os = `uname` or die $!;
+
+    $os = lc $os;
+    return 'aix' if $os =~ /^aix/;
+    return 'bsd' if $os =~ /^\wbsd/;
+    return 'linux' if $os =~ /^linux/;
+    return 'macosx' if $os =~ /^darwin/;
+    return 'solaris' if $os =~ /^sunos/;
+
+    return 'UNKNOWN_PLATFORM';
+}
+
+
+
+sub cmdInstallLua
+{
+    my $ver = shift @ARGV;
+    my $instpath = "$LUA_DIR/$ver";
+
+    unshift( @ARGV, getPlatform() ) if !@ARGV;
+    cmdInstall( $LUA_VERS_TXT, $ver, $instpath, "INSTALL_TOP=$instpath" );
+    #installRocks( $instpath );
+}
+
+
+sub cmdInstallLuaJIT
+{
+    my $ver = shift @ARGV;
+    my $instpath = "$LUAJIT_DIR/$ver";
+    my $postflight = <<_EOS_;
+
+#
+# postflight script for luajit
+#
+
+# create symbolic link if there is luajit
+# link: ${instpath}/bin/luajit -> ${instpath}/bin/lua
+cd "${instpath}/bin"
+ln -s luajit lua
+
+# link: ${instpath}/include/\${header} -> ${instpath}/include/\${header##*/}
+cd '../include'
+for header in \$(ls -A */*); do
+    ln -s \${header}
+done
+
+cd '../lib'
+for lib in \$(ls -A liblua*); do
+    if ! [ -L \${lib} ] && [ -f \${lib} ]; then
+        # link: ${instpath}/lib/\${lib} -> ${instpath}/lib/liblua.\${lib##*.}
+        ln -s \${lib} "liblua.\${lib##*.}"
+    fi
+done
+
+_EOS_
+
+    cmdInstall( $LUAJIT_VERS_TXT, $ver, $instpath, "PREFIX=$instpath", $postflight );
+}
+
+
+#
+# uninstall
+#
+sub cmdUninstall
+{
+    my ( $dir, $ver ) = @_;
+
+    die "invalid version number $ver" if $ver !~ /\d+(.\d+)*$/;
+    die "version $ver does not installed\n" if !-d $dir;
+
+    print "uninstall $dir\n";
+    shcall( "rm -rf $dir" );
+}
+
+
+sub cmdUninstallLua
+{
+    my $ver = shift @ARGV;
+    cmdUninstall( "$LUA_DIR/$ver", $ver );
+}
+
+
+sub cmdUninstallLuaJIT
+{
+    my $ver = shift @ARGV;
+    cmdUninstall( "$LUAJIT_DIR/$ver", $ver );
+}
+
+
+#
+# list LUA_DIR contents
+#
+sub cmdList
+{
+    my @dirs = (
+        { name => 'lua', path => "$LUA_DIR" },
+        { name => 'luajit', path => "$LUAJIT_DIR" }
+    );
+
+    foreach my $dir ( @dirs )
+    {
+        if( -d $dir->{path} )
+        {
+            print "$dir->{name}: $dir->{path}\n";
+
+            if( opendir( my $dh, $dir->{path} ) )
+            {
+                my @list = grep( /[^.]/, readdir( $dh ) );
+
+                closedir( $dh );
+
+                foreach( @list ){
+                    print "$_\n";
+                }
+            }
+            else {
+                print "could not open directory: $dir->{path}\n"
+            }
+            print "\n";
+        }
+    }
+}
+
+
+#
+# list available versions
+#
+sub cmdVers
+{
+    my @srcs = (
+        { name => 'lua', file => $LUA_VERS_TXT },
+        { name => 'luajit', file => $LUAJIT_VERS_TXT },
+        { name => 'luarocks', file => $ROCKS_VERS_TXT }
+    );
+
+    foreach my $list ( @srcs )
+    {
+        print "$list->{name}\nversion\tsource\n";
+
+        if( -f $list->{file} )
+        {
+            if( open( my $fh, $list->{file} ) )
+            {
+				while( <$fh> ){
+                    my @col = split( /\s/, $_ );
+                    print "$col[0]\t$col[1]\n";
+                }
+				close($fh);
+			}
+			else {
+                print "cannot open $list->{file} : $!\n";
+			}
+        }
+        else {
+            print "$list->{file} not found\n";
+        }
+        print "\n";
+    }
+}
+
+
+
+#
+# fetch remote versions
+#
+sub parseRocksVers
+{
+    local $/ = undef;
+    my ( $file, $fh ) = @_;
+    my $html = <$fh>;
+    my @arr = ();
+
+    # print and save versions
+    while( $html =~ /href="(luarocks-((\d+\.\d+)(?:\.\d+)*)\.tar\.gz)"/sig )
+    {
+        # version 2.2 or later
+        if( $3 >= 2.2 ){
+            print "$2\t$1\n";
+            push @arr, "$2 http://keplerproject.github.io/luarocks/releases/$1 $1";
+        }
+    }
+    @arr = reverse( sort @arr );
+    print $file join( "\n", @arr );
+}
+
+
+sub parseLuaJITVers
+{
+    local $/ = undef;
+    my ( $file, $fh ) = @_;
+    my $html = <$fh>;
+    my @arr = ();
+
+    # print and save versions
+    while( $html =~ /^([a-f0-9]+)\s+(luajit-((\d+)(?:\.\d+)*)\.tar\.gz)/mig )
+    {
+        # versioin 2 or later
+        if( $3 >= 2 ){
+            print "$3\t$2 $1\n";
+            push @arr, "$3 http://luajit.org/download/$2 $2 $1";
+
+        }
+    }
+    @arr = reverse( sort @arr );
+    print $file join( "\n", @arr );
+}
+
+
+sub parseLuaVers
+{
+    local $/ = undef;
+    my ( $file, $fh ) = @_;
+    my $html = <$fh>;
+    my @arr = ();
+    
+    # print and save versions
+    while( $html =~ /href="(lua-((\d+\.\d+)(?:\.\d+)*)\.tar\.gz)".+?md5:\s*([a-f0-9]+)/sig )
+    {
+        # versioin 5.1 or later
+        if( $3 >= 5.1 ){
+            print "$2\t$1 $4\n";
+            push @arr, "$2 http://www.lua.org/ftp/$1 $1 $4";
+        }
+    }
+    @arr = reverse( sort @arr );
+    print $file join("\n", @arr );
+}
+
+
+
+#
+# setup
+#
+sub cmdUpdate
+{
+    # create required directories
+    my @arr = (
+        $LENV_DIR, $BIN_DIR, $SRC_DIR, $LUA_DIR, $LUAJIT_DIR, $TMP_DIR
+    );
+
+    foreach( @arr ){
+        mkdir $_ if !-d $_;
+    }
+
+    # fetch lenv
+    shcall( "$CURL -L --compressed 'http://git.io/lenv' > ${LENV}" );
+    shcall( "chmod +x ${LENV}" );
+    shcall( "${LENV} > ~/.lenvrc" );
+}
+
+
+sub cmdFetch
+{
+    my @targets = (
+        {
+            name    => 'lua',
+            file    => $LUA_VERS_TXT,
+            url     => 'http://www.lua.org/ftp/',
+            parse   => \&parseLuaVers
+        },
+        {
+            name    => 'luajit',
+            file    => $LUAJIT_VERS_TXT,
+            url     => 'http://luajit.org/download.html',
+            parse   => \&parseLuaJITVers
+        },
+        {
+            name    => 'luarocks',
+            file    => $ROCKS_VERS_TXT,
+            url     => 'http://keplerproject.github.io/luarocks/releases/',
+            parse   => \&parseRocksVers
+        }
+    );
+    my $tmp;
+
+    foreach my $target ( @targets )
+    {
+        # clear list files
+        if( -f $target->{file} ){
+            print "remove $target->{file}\n";
+            unlink $target->{file} or die $!;
+        }
+
+        # fetch version list
+        print "download $target->{url}\n";
+        $tmp = "$TMP_DIR/html";
+        shcall( "$CURL -L --compressed $target->{url} > $tmp" );
+
+        # parse version files
+        open( my $fh, '>', $target->{file} ) or die "could not open $target->{file}: $!";
+        open( my $fhtmp, $tmp ) or die "could not open $tmp: $!";
+        $target->{parse}( $fh, $fhtmp );
+        close( $fh );
+        close( $fhtmp );
+        unlink $tmp;
+
+        print "\n";
+    }
+    print "\n";
+}
+
+
+#
+# show paths
+#
+sub cmdPath
+{
+    print <<_EOS_
+#
+# please add the following lenv settings to your environment
+#
+export PATH=${BIN_DIR}:${CURRENT_DIR}/bin:\$PATH
+export LUA_PATH='${CURRENT_DIR}/luarocks/share/?.lua;${CURRENT_DIR}/luarocks/share/?/init.lua;;'
+export LUA_CPATH='${CURRENT_DIR}/luarocks/lib/?.so;;'
+
+_EOS_
+
+}
 
 
 #
 # print usage
 #
-function cmdUsage() {
-    cat << _EOS_
+sub cmdUsage()
+{
+    print <<_EOS_
 lenv ${VERSION}
 
 Usage:
@@ -87,382 +654,69 @@ Usage:
 
 _EOS_
 
-    exit
-}
-
-
-#
-# show paths
-#
-function cmdPath() {
-
-    cat << _EOS_
-#
-# please add the following lenv settings to your environment
-#
-export PATH=${BIN_DIR}:${CURRENT_DIR}/bin:\$PATH
-export LUA_PATH='${CURRENT_DIR}/luarocks/share/?.lua;${CURRENT_DIR}/luarocks/share/?/init.lua;;'
-export LUA_CPATH='${CURRENT_DIR}/luarocks/lib/?.so;;'
-
-
-_EOS_
-
-}
-
-
-#
-# setup
-#
-function cmdUpdate() {
-    # check directory existence
-    for dir in $LENV_DIR $BIN_DIR $SRC_DIR $LUA_DIR $LUAJIT_DIR $TMP_DIR; do
-        if ! [ -d $dir ]; then
-            mkdir $dir
-        fi
-    done
-    
-    # fetch lenv
-    $CURL -L --compressed 'http://git.io/lenv' > "${LENV}"
-    chmod +x ${LENV}
-    
-    cmdPath
-}
-
-if ! [ -f ${LENV} ]; then
-    cmdUpdate
-    exit
-fi
-
-
-
-#
-# fetch remote versions
-#
-function _parseLuaVers() {
-    local vers=($(cat ${LUA_VERS_HTML} | ${PERL} -ne 'print "$1\t" if /lua-([0-9]+(?:\.[0-9]+)*)\.tar\.gz/;'))
-    local sums=($(cat ${LUA_VERS_HTML} | ${PERL} -ne 'print "$1\n" if /md5:\s*([a-f0-9]+)/;'))
-    local idx=0
-
-    # print and save versions
-    for ver in "${vers[@]}"; do
-        echo "lua-${ver} ${sums[$idx]}"
-        echo "${ver} http://www.lua.org/ftp/lua-${ver}.tar.gz lua-${ver} .tar.gz ${sums[$idx]}" >> ${LUA_VERS_TXT}
-        idx=$(expr ${idx} + 1)
-    done
-}
-
-
-function _parseLuaJITVers() {
-    local vers=($(cat ${LUAJIT_VERS_HTML} | ${PERL} -ne 'print "$1\t" if /^(?:[a-f0-9]+)\s+LuaJIT-([0-9]+(?:\.[0-9]+)*)\.tar\.gz/;'))
-    local sums=($(cat ${LUAJIT_VERS_HTML} | ${PERL} -ne 'print "$1\t" if /^([a-f0-9]+)\s+LuaJIT-([0-9]+(?:\.[0-9]+)*)\.tar\.gz/;'))
-    local idx=0
-
-    # print and save versions
-    for ver in "${vers[@]}"; do
-        echo "LuaJIT-${ver} ${sums[$idx]}"
-        echo "${ver} http://luajit.org/download/LuaJIT-${ver}.tar.gz luajit-${ver} .tar.gz ${sums[$idx]}" >> ${LUAJIT_VERS_TXT}
-        idx=$(expr ${idx} + 1)
-    done
-}
-
-
-function _parseRocksVers() {
-    local vers=($(cat ${ROCKS_VERS_HTML} | ${PERL} -ne 'print "$1\t" if /luarocks-([0-9]+(?:\.[0-9]+)*)\.tar\.gz/;'))
-
-    # print and save versions
-    for ver in "${vers[@]}"; do
-        echo "luarocks-${ver}"
-        echo "${ver} http://keplerproject.github.io/luarocks/releases/luarocks-${ver}.tar.gz luarocks-${ver} .tar.gz" >> ${ROCKS_VERS_TXT}
-    done
-}
-
-
-function cmdFetch() {
-    # clear list files
-    for txt in ${LUA_VERS_TXT} ${LUAJIT_VERS_TXT} ${ROCKS_VERS_TXT}; do
-        if [ -f ${txt} ]; then
-            $(: > ${txt})
-        fi
-    done
-    
-    # fetch version list
-    $CURL -L --compressed 'http://www.lua.org/ftp/' > ${LUA_VERS_HTML}
-    $CURL -L --compressed 'http://luajit.org/download.html' > ${LUAJIT_VERS_HTML}
-    $CURL -L --compressed 'http://keplerproject.github.io/luarocks/releases/' > ${ROCKS_VERS_HTML}
-
-    # parse version files
-    _parseLuaVers
-    _parseLuaJITVers
-    _parseRocksVers
-}
-
-
-#
-# list available versions
-#
-function _listVers() {
-    local txt=$1
-    
-    if [ -f ${txt} ]; then
-        echo 'version\tsource'
-        while read line; do
-            ary=(${line})
-            echo "${ary[0]}\t${ary[1]}"
-        done < ${txt}
-    else
-        echo "${txt} not found"
-    fi
-    echo ''
-}
-
-function cmdVers() {
-    
-    echo 'lua'
-    _listVers ${LUA_VERS_TXT}
-    
-    echo 'luajit'
-    _listVers ${LUAJIT_VERS_TXT}
-
-    echo 'luarocks'
-    _listVers ${ROCKS_VERS_TXT}
-}
-
-
-#
-# list LUA_DIR contents
-#
-function _listInstalled() {
-    local dirs=$1
-    local ver;
-
-    for dir in $dirs; do
-        # extract version number
-        ver=$($PERL -e "print( \"${dir}\" =~ /.*\/([0-9]+(\.[0-9]+)*)$/ && \$1)")
-        if [ -d $dir ] && [ -n "$ver" ]; then
-            echo $ver
-        fi
-    done
-    echo ''
-}
-
-function cmdList() {
-    echo 'lua'
-    _listInstalled "${LUA_DIR}/*"
-    
-    echo 'luajit'
-    _listInstalled "${LUAJIT_DIR}/*"
-}
-
-
-#
-# install
-#
-function _download() {
-    local file=$1
-    local url=$2
-    
-    # download if not exists
-    if ! [ -f ${file} ]; then
-        echo "download ${url}"
-        $CURL -o ${file} -L ${url}
-    fi
-    # extract
-    echo "extract ${file}"
-    $TAR xzf ${file}
-}
-
-
-function _installRocks() {
-    local ver=$1
-    local path=$2
-    local file
-    local ary
-    
-    cd ${SRC_DIR}
-    while read line; do
-        ary=(${line})
-    done < ${ROCKS_VERS_TXT}
-
-    echo "${ver} ${path}"
-    echo "install ${ary[2]} ${ary[1]}"
-    _download "${ary[2]}${ary[3]}" ${ary[1]}
-    
-    # compile and install
-    cd ${ary[2]}
-    ./configure --prefix=${path} --sysconfdir=${path}/luarocks --with-lua=${path} --with-lua-bin=${path}/bin --with-lua-include=${path}/include --with-lua-lib=${path}/lib
-    make bootstrap
-    cd ../
-    rm -rf ${ary[2]}
-    
-    # create symbolic link
-    echo 'create symbolic links...'
-    cd ${path}
-    regex="${path}/(share|lib)/([^?]+)/"
-    script=$(cat << _EOS_
-        my \$line = <STDIN>;
-        my \$regex = "${regex}";
-        
-        if( \$line =~ /LUA_C?PATH='(.+)'/ )
-        {
-            my @arr = split( /;/, \$1 );
-            
-            foreach ( @arr )
-            {
-                if( \$_ =~ \$regex ){
-                    my \$dir = "${path}/\$1/\$2";
-                    my \$dst = "${path}/luarocks/\$1";
-                    
-                    print "ln -s \$dir, \$dst\n";
-                    if( -e \$dst ){
-                        unlink \$dst or die \$!;
-                    }
-                    symlink \$dir, \$dst or die \$!;
-                }
-            }
-        }
-_EOS_)
-
-    command bin/luarocks path | while read line; do
-        echo "${line}" | perl -e "${script}"
-    done
-}
-
-
-function cmdInstall() {
-    local ver=$2
-    local dir=$3
-    local path="${dir}/${ver}"
-    local prefix="$4=${path}"
-    local args=(${ARGV})
-    local file
-    local ary
-    
-    args[0]=''
-    args[1]=''
-    args=(${args[@]})
-    
-    cd ${SRC_DIR}
-    while read line; do
-        ary=(${line})
-        if [ "x${ary[0]}" = "x${ver}" ]; then
-            echo "install ${ary[2]} ${ary[1]}"
-            _download "${ary[2]}${ary[3]}" ${ary[1]}
-            
-            # compile and install
-            cd ${ary[2]}
-            make ${args[@]}
-            rm -rf ${prefix}
-            make install ${prefix}
-            cd ../
-            rm -rf ${ary[2]}
-            
-            # create symbolic link if there is luajit
-            if [ $1 = ${LUAJIT_VERS_TXT} ]; then
-                echo "link: ${path}/bin/luajit -> ${path}/bin/lua"
-                cd "${path}/bin"
-                ln -s luajit lua
-                
-                cd '../include'
-                for header in $(ls -A */*); do
-                    echo "link: ${path}/include/${header} -> ${path}/include/${header##*/}"
-                    ln -s ${header}
-                done
-                
-                cd '../lib'
-                for lib in $(ls -A liblua*); do
-                    if ! [ -L ${lib} ] && [ -f ${lib} ]; then
-                        echo "link: ${path}/lib/${lib} -> ${path}/lib/liblua.${lib##*.}"
-                        ln -s ${lib} "liblua.${lib##*.}"
-                    fi
-                done
-            fi
-            
-            _installRocks ${ver} ${path}
-            
-            exit
-        fi
-    done < $1
-    
-    echo "version ${ver} not found" >&2
-    exit 1
-}
-
-
-#
-# uninstall
-#
-function cmdUninstall() {
-    local dirs="$1/*"
-    local target=$2;
-    
-    for dir in ${dirs}; do
-        # extract version number
-        ver=$($PERL -e "print( \"${dir}\" =~ /.*\/([0-9]+(\.[0-9]+)*)$/ && \$1)")
-        if [ -d $dir ] && [ "x${ver}" = "x${target}" ]; then
-            echo "uninstall ${dir}"
-            rm -rf ${dir}
-            exit
-        fi
-    done
-
-    echo "version ${target} is not uninstalled" >&2
-    exit 1
-}
-
-
-#
-# use
-#
-function cmdUse() {
-    local dir=$1
-    local ver=$2
-    
-    if ! [ -d ${dir} ]; then
-        echo "version ${ver} not installed"
-        exit 1
-    fi
-    
-    cd ${LENV_DIR}
-    # remove current symbolic link
-    if [ -L ${CURRENT_DIR} ]; then
-        rm ${CURRENT_DIR}
-    fi
-    
-    # create new symbolic link
-    ln -s ${dir} ${CURRENT_DIR}
 }
 
 
 #
 # check command
 #
-case $1 in
-    "help" )
-        cmdUsage ;;
-    "path" )
-        cmdPath ;;
-    "update" )
-        cmdUpdate ;;
-    "fetch" )
-        cmdFetch ;;
-    "vers" )
-        cmdVers ;;
-    "ls" )
-        cmdList ;;
-    "install" )
-        cmdInstall ${LUA_VERS_TXT} $2 ${LUA_DIR} 'INSTALL_TOP' ;;
-    "install-lj" )
-        cmdInstall ${LUAJIT_VERS_TXT} $2 ${LUAJIT_DIR} 'PREFIX' ;;
-    "uninstall" )
-        cmdUninstall ${LUA_DIR} $2  ;;
-    "uninstall-lj" )
-        cmdUninstall ${LUAJIT_DIR} $2 ;;
-    "use" )
-        cmdUse "${LUA_DIR}/$2" $2 ;;
-    "use-lj" )
-        cmdUse "${LUAJIT_DIR}/$2" $2 ;;
-    * )
-        echo "unknown command.\n"
-        cmdUsage ;;
-esac
+sub CheckArgs
+{
+    my %CMDS = (
+        help => {
+            run => \&cmdUsage
+        },
+        path => {
+            run => \&cmdPath
+        },
+        update => {
+            run => \&cmdUpdate
+        },
+        fetch => {
+            run => \&cmdFetch
+        },
+        vers => {
+            run => \&cmdVers
+        },
+        ls => {
+            run => \&cmdList
+        },
+        install => {
+            run => \&cmdInstallLua
+        },
+        "install-lj" => {
+            run => \&cmdInstallLuaJIT
+        },
+        uninstall => {
+            run => \&cmdUninstallLua
+        },
+        "uninstall-lj" => {
+            run => \&cmdUninstallLuaJIT
+        },
+        "use" => {
+            run => \&cmdUseLua
+        },
+        "use-lj" => {
+            run => \&cmdUseLuaJIT
+        }
+    );
+    my $arg = shift @ARGV;
+    my $cmd = $CMDS{$arg};
 
+    if( $cmd ){
+        $cmd->{run}();
+    }
+    else {
+        print "unknown command.\n";
+        cmdUsage();
+        exit(1);
+    }
+}
+
+
+if( !-f $LENV ){
+    cmdUpdate;
+}
+else {
+    CheckArgs;
+}
