@@ -711,8 +711,28 @@ sub CheckArgs
 }
 
 
-if( !-f $LENV ){
+if( !-f $LENV )
+{
     cmdUpdate;
+
+    print <<_EOS_
+lenv has been installed!
+please run the following command to enable the lenv;
+
+    source ~/.lenvrc
+
+if you need to be enabled the lenv on login, please add the following script
+into .bashrc or .bash_profile;
+
+    #
+    # load ~/.lenvrc
+    #
+    if [ -f ~/.lenvrc ]; then
+        source ~/.lenvrc
+    fi
+
+_EOS_
+
 }
 else {
     CheckArgs;
