@@ -8,8 +8,8 @@ Lua Version Manager.
 ## Installation
 
 ```sh
-$ curl -L http://git.io/lenv | sh >> ~/.bashrc
-$ source ~/.bashrc
+$ curl -L http://git.io/lenv | perl
+$ source ~/.lenvrc
 ```
 
 ### Installation Location
