@@ -1,4 +1,4 @@
-#!/bin/env perl
+#$ENVBIN
 #
 #  Copyright (C) 2015 Masatoshi Teruya
 #
@@ -544,6 +544,7 @@ sub cmdUpdate
     my @arr = (
         $LENV_DIR, $BIN_DIR, $SRC_DIR, $LUA_DIR, $LUAJIT_DIR, $TMP_DIR
     );
+    my $envbin = `which env`;
 
     foreach( @arr ){
         mkdir $_ if !-d $_;
@@ -552,6 +553,11 @@ sub cmdUpdate
     # fetch lenv
     shcall( "$CURL -L --compressed 'http://git.io/lenv' > ${LENV}" );
     shcall( "chmod +x ${LENV}" );
+
+    # replace $ENVBIN string to shebang
+    chomp( $envbin );
+    die $! if system( "sed -i -e 's|^#\$ENVBIN|#!${envbin} perl|' ${LENV}" );
+
     shcall( "${LENV} path > ~/.lenvrc" );
 }
 
