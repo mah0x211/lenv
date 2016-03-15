@@ -21,8 +21,12 @@
 #  THE SOFTWARE.
 #
 
+use 5.008;
+
 use strict;
-use encoding "utf8";
+use warnings;
+
+binmode STDOUT, ":encoding(UTF-8)";
 use open ":encoding(utf8)";
 
 my $VERSION = '0.1.0';
@@ -120,11 +124,12 @@ sub extract
     my $src = shift;
     my $dir;
     my @list;
+    my $dh;
 
     shcall( "mkdir -p $TMP_DIR" );
 
     # cleanup dir
-    opendir( my $dh, $TMP_DIR ) or die $!;
+    opendir( $dh, $TMP_DIR ) or die $!;
     @list = grep( /[^.]/, readdir( $dh ) );
     foreach( @list ){
         shcall( "rm -rf $TMP_DIR/$_" );
@@ -135,7 +140,7 @@ sub extract
     shcall( "$TAR xzf $src -C $TMP_DIR" );
 
     # find dir
-    opendir( my $dh, $TMP_DIR ) or die $!;
+    opendir( $dh, $TMP_DIR ) or die $!;
     @list = grep( /[^.]/, readdir( $dh ) );
     foreach( @list ){
         $dir = "$TMP_DIR/$_";
