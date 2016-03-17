@@ -165,9 +165,9 @@ sub download
 
     # verify checksum
     if( $checksum ){
-        $sum = `$OPENSSL md5 -r $src`;
+        $sum = `$OPENSSL md5 $src`;
         chomp( $sum );
-        die "checksum of $file does not match $checksum" if $sum !~ /^$checksum/;
+        die "checksum of $file does not match $checksum" if $sum !~ /$checksum/;
     }
 
     return $src;
