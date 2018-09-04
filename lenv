@@ -507,7 +507,7 @@ sub parseLuaJITVers
     while( $html =~ /^([a-f0-9]+)\s+(luajit-((\d+)(?:\.\d+)*)\.tar\.gz)/mig )
     {
         # versioin 2 or later
-        if( $3 >= 2 ){
+        if( $4 >= 2 ){
             print "$3\t$2 $1\n";
             push @arr, "$3 http://luajit.org/download/$2 $2 $1";
 
