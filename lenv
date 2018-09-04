@@ -735,12 +735,12 @@ please run the following command to enable the lenv;
 if you need to be enabled the lenv on login, please add the following script
 into .bashrc or .bash_profile;
 
-    #
-    # load ~/.lenvrc
-    #
-    if [ -f ~/.lenvrc ]; then
-        source ~/.lenvrc
-    fi
+#
+# load ~/.lenvrc
+#
+if [ -f ~/.lenvrc ]; then
+    source ~/.lenvrc
+fi
 
 _EOS_
 
