@@ -364,6 +364,10 @@ for lib in \$(ls -A liblua*); do
     fi
 done
 
+# link: ${instpath}/share/luajit* -> ${instpath}/share/lua
+cd '../share'
+ln -s \$PWD/luajit-*/* lua/*/
+
 _EOS_
 
     cmdInstall( $LUAJIT_VERS_TXT, $ver, $instpath, "PREFIX=$instpath", $postflight );
