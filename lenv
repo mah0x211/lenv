@@ -331,7 +331,6 @@ sub cmdInstallLua
 
     unshift( @ARGV, getPlatform() ) if !@ARGV;
     cmdInstall( $LUA_VERS_TXT, $ver, $instpath, "INSTALL_TOP=$instpath" );
-    #installRocks( $instpath );
 }
 
 
