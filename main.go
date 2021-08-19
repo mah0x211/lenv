@@ -38,8 +38,8 @@ var (
 		Name:        "luajit",
 		RootDir:     filepath.Join(LenvDir, "luajit"),
 		VersionFile: filepath.Join(LenvDir, "luajit_vers.txt"),
-		ReleaseURL:  "http://luajit.org/download.html",
-		DownloadURL: "http://luajit.org/download/",
+		ReleaseURL:  "https://luajit.org/download.html",
+		DownloadURL: "https://luajit.org/download/",
 	}
 	LuaRocksCfg = &TargetConfig{
 		Name:        "luarocks",
