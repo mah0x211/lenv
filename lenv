@@ -512,7 +512,7 @@ sub parseLuaJITVers
         # versioin 2 or later
         if( $4 >= 2 ){
             print "$3\t$2 $1\n";
-            push @arr, "$3 http://luajit.org/download/$2 $2 $1";
+            push @arr, "$3 https://luajit.org/download/$2 $2 $1";
 
         }
     }
@@ -582,7 +582,7 @@ sub cmdFetch
         {
             name    => 'luajit',
             file    => $LUAJIT_VERS_TXT,
-            url     => 'http://luajit.org/download.html',
+            url     => 'https://luajit.org/download.html',
             parse   => \&parseLuaJITVers
         },
         {
