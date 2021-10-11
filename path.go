@@ -36,7 +36,7 @@ func cmdPath() {
 				dir := prefix + strconv.Itoa(i)
 				paths = append(paths, dir+"/?.lua", dir+"/?/init.lua")
 			}
-			value = strings.Join(paths, ";")
+			value = strings.Join(paths, ";") + ";"
 
 		case "LUA_CPATH":
 			format = `export %s="%s;"`
@@ -46,7 +46,7 @@ func cmdPath() {
 				dir := prefix + strconv.Itoa(i)
 				paths = append(paths, dir+"/?.so")
 			}
-			value = strings.Join(paths, ";")
+			value = strings.Join(paths, ";") + ";"
 		}
 		printf(format, name, value)
 	}
