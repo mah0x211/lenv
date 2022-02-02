@@ -16,7 +16,7 @@ var (
 	ReSemVer      = regexp.MustCompile(`(?s)^\d+(?:\.\d+){1,2}`)
 	ReLuaRocksVer = regexp.MustCompile(`(?si)href="(luarocks-([^"]+?)\.tar\.gz).*?href="(luarocks-[^"]+?\.tar\.gz\.asc)"`)
 	ReLuaJitVer   = regexp.MustCompile(`(?i)([0-9a-f]+?)\s+(LuaJIT-([^\s]+?)\.tar\.gz)`)
-	ReLuaVer      = regexp.MustCompile(`(?si)<tr>\s*<td class="name"><a href="(lua-([^"]+?)\.tar\.gz).+?class="sum">.+?sha1:\s*([0-9a-f]+).*?</td>\s*</tr>`)
+	ReLuaVer      = regexp.MustCompile(`(?si)<tr>\s*<td class="name"><a href="(lua-([^"]+?)\.tar\.gz).+?class="sum">([0-9a-f]+)</td>\s*</tr>`)
 )
 
 func isSemVer(ver string) bool {
@@ -69,7 +69,7 @@ func parseLuaVers(body []byte) List {
 	for _, m := range ReLuaVer.FindAllSubmatch(body, -1) {
 		name := string(m[1])
 		ver := string(m[2])
-		sum := "sha1:" + string(m[3])
+		sum := "sha256:" + string(m[3])
 		if isSemVer(ver) {
 			list[ver] = &ListItem{
 				Name: name,
