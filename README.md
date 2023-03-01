@@ -1,6 +1,8 @@
 lenv
 =========
 
+[![test](https://github.com/mah0x211/lenv/actions/workflows/test.yml/badge.svg)](https://github.com/mah0x211/lenv/actions/workflows/test.yml)
+
 Lua Version Manager.
 
 ---
