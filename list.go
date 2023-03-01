@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
@@ -56,7 +55,7 @@ func listRocks(luadir string) {
 			}
 		}
 	}
-	sort.Sort(sort.Reverse(sort.StringSlice(vers)))
+	sortVersions(vers)
 
 	if len(vers) > 0 {
 		format := fmt.Sprintf("    %%s %%-%ds", maxlen)

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"path/filepath"
 	"regexp"
-	"sort"
 )
 
 type ParseFunc func(body []byte) List
@@ -121,7 +120,7 @@ func cmdFetch() {
 			}
 			vers = append(vers, ver)
 		}
-		sort.Sort(sort.Reverse(sort.StringSlice(vers)))
+		sortVersions(vers)
 		format := fmt.Sprintf("%%-%ds    %%s", maxlen)
 
 		for _, ver := range vers {
