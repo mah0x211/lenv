@@ -323,19 +323,24 @@ func cmdInstall(cfg *TargetConfig, opts []string) {
 	if len(opts) == 0 {
 		cmdHelp(1, "no version specified")
 	}
+
+	vers, err := NewVersionsFromFile(cfg.VersionFile)
+	if err != nil {
+		fatalf("failed to read version file %q: %v", cfg.VersionFile, err)
+	}
+
 	ver := opts[0]
 	opts = opts[1:]
-
-	item, err := getVerInfo(cfg.VersionFile, ver)
-	if err != nil {
-		fatalf("failed to get version info: %v", err)
-	} else if item == nil {
+	item := vers.PickItem(ver)
+	if item == nil {
 		fatalf("%s version %q does not defined in %q", cfg.Name, ver, cfg.VersionFile)
 	} else if item.Ext != ".tar.gz" {
 		fatalf("unsupported media-type %q", item.Name)
 	}
+	ver = item.Ver
 	url := cfg.DownloadURL + filepath.Clean(item.Name)
 
+	printf("install %q", item.Ver)
 	printf("download %q", url)
 	data, err := download(url)
 	if err != nil {

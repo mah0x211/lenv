@@ -11,9 +11,9 @@ func Test_parseLuaRocksVers(t *testing.T) {
 	exp := []string{"luarocks-3.5.0.tar.gz", "luarocks-3.4.0.tar.gz", "luarocks-3.3.1.tar.gz", "luarocks-3.3.0.tar.gz", "luarocks-3.2.1.tar.gz", "luarocks-3.2.0.tar.gz", "luarocks-3.1.3.tar.gz", "luarocks-3.1.2.tar.gz", "luarocks-3.1.1.tar.gz", "luarocks-3.1.0.tar.gz", "luarocks-3.0.4.tar.gz", "luarocks-3.0.3.tar.gz", "luarocks-3.0.2.tar.gz", "luarocks-3.0.1.tar.gz", "luarocks-3.0.1-rc2.tar.gz", "luarocks-3.0.1-rc1.tar.gz", "luarocks-3.0.0.tar.gz", "luarocks-3.0.0-rc2.tar.gz", "luarocks-3.0.0-rc1.tar.gz", "luarocks-3.0.0beta2.tar.gz", "luarocks-3.0.0beta1.tar.gz", "luarocks-2.4.4.tar.gz", "luarocks-2.4.3.tar.gz", "luarocks-2.4.2.tar.gz", "luarocks-2.4.1.tar.gz", "luarocks-2.4.0.tar.gz", "luarocks-2.3.0.tar.gz", "luarocks-2.3.0-rc2.tar.gz", "luarocks-2.3.0-rc1.tar.gz", "luarocks-2.2.3-rc2.tar.gz", "luarocks-2.2.3-rc1.tar.gz", "luarocks-2.2.2.tar.gz", "luarocks-2.2.1.tar.gz", "luarocks-2.2.0.tar.gz", "luarocks-2.2.0beta1.tar.gz", "luarocks-2.1.2.tar.gz", "luarocks-2.1.1.tar.gz", "luarocks-2.1.0.tar.gz", "luarocks-2.1.0-rc3.tar.gz", "luarocks-2.1.0-rc2.tar.gz", "luarocks-2.1.0-rc1.tar.gz", "luarocks-2.0.13.tar.gz", "luarocks-2.0.12.tar.gz", "luarocks-2.0.11.tar.gz", "luarocks-2.0.10.tar.gz", "luarocks-2.0.9.1.tar.gz", "luarocks-2.0.9.tar.gz", "luarocks-2.0.9-rc2.tar.gz", "luarocks-2.0.9-rc1.tar.gz", "luarocks-2.0.8.tar.gz", "luarocks-2.0.8-rc2.tar.gz", "luarocks-2.0.8-rc1.tar.gz", "luarocks-2.0.7.1.tar.gz", "luarocks-2.0.7.tar.gz", "luarocks-2.0.6.tar.gz", "luarocks-2.0.6-rc1.tar.gz", "luarocks-2.0.5.tar.gz", "luarocks-2.0.5-rc1.tar.gz", "luarocks-2.0.4.1.tar.gz", "luarocks-2.0.4.tar.gz", "luarocks-2.0.4-rc3.tar.gz", "luarocks-2.0.4-rc2.tar.gz", "luarocks-2.0.4-rc1.tar.gz", "luarocks-2.0.3.tar.gz", "luarocks-2.0.3-rc2.tar.gz", "luarocks-2.0.3-rc1.tar.gz", "luarocks-2.0.2.tar.gz", "luarocks-2.0.1.tar.gz", "luarocks-2.0.tar.gz", "luarocks-1.0.1.tar.gz", "luarocks-1.0.tar.gz", "luarocks-0.6.0.2.tar.gz", "luarocks-0.5.2.tar.gz", "luarocks-0.5.1.tar.gz", "luarocks-0.5.tar.gz", "luarocks-0.4.3.tar.gz", "luarocks-0.4.2.tar.gz", "luarocks-0.4.1.tar.gz", "luarocks-0.4.tar.gz", "luarocks-0.3.2.tar.gz", "luarocks-0.3.1.tar.gz", "luarocks-0.3.tar.gz", "luarocks-0.2.tar.gz", "luarocks-0.1.tar.gz"}
 	names := []string{}
 
-	for ver, item := range parseLuaRocksVers([]byte(LuaRocksHTML)) {
+	list, _ := parseLuaRocksVers([]byte(LuaRocksHTML)).GetList()
+	for _, item := range list {
 		names = append(names, item.Name)
-		assert.Equal(t, ver, item.Ver)
 	}
 	sort.Strings(exp)
 	sort.Strings(names)
@@ -24,9 +24,9 @@ func Test_parseLuaJitVers(t *testing.T) {
 	exp := []string{"LuaJIT-2.1.0-beta3.tar.gz", "LuaJIT-2.0.5.tar.gz", "LuaJIT-1.1.8.tar.gz", "LuaJIT-1.0.3.tar.gz"}
 	names := []string{}
 
-	for ver, item := range parseLuaJitVers([]byte(LuaJitHTML)) {
+	list, _ := parseLuaJitVers([]byte(LuaJitHTML)).GetList()
+	for _, item := range list {
 		names = append(names, item.Name)
-		assert.Equal(t, ver, item.Ver)
 	}
 	sort.Strings(exp)
 	sort.Strings(names)
@@ -37,9 +37,9 @@ func Test_parseLuaVers(t *testing.T) {
 	exp := []string{"lua-5.4.4.tar.gz", "lua-5.4.3.tar.gz", "lua-5.4.2.tar.gz", "lua-5.4.1.tar.gz", "lua-5.4.0.tar.gz", "lua-5.3.6.tar.gz", "lua-5.3.5.tar.gz", "lua-5.3.4.tar.gz", "lua-5.3.3.tar.gz", "lua-5.3.2.tar.gz", "lua-5.3.1.tar.gz", "lua-5.3.0.tar.gz", "lua-5.2.4.tar.gz", "lua-5.2.3.tar.gz", "lua-5.2.2.tar.gz", "lua-5.2.1.tar.gz", "lua-5.2.0.tar.gz", "lua-5.1.5.tar.gz", "lua-5.1.4.tar.gz", "lua-5.1.3.tar.gz", "lua-5.1.2.tar.gz", "lua-5.1.1.tar.gz", "lua-5.1.tar.gz", "lua-5.0.3.tar.gz", "lua-5.0.2.tar.gz", "lua-5.0.1.tar.gz", "lua-5.0.tar.gz", "lua-4.0.1.tar.gz", "lua-4.0.tar.gz", "lua-3.2.2.tar.gz", "lua-3.2.1.tar.gz", "lua-3.2.tar.gz", "lua-3.1.tar.gz", "lua-3.0.tar.gz", "lua-2.5.tar.gz", "lua-2.4.tar.gz", "lua-2.2.tar.gz", "lua-2.1.tar.gz", "lua-1.1.tar.gz", "lua-1.0.tar.gz"}
 	names := []string{}
 
-	for ver, item := range parseLuaVers([]byte(LuaHTML)) {
+	list, _ := parseLuaVers([]byte(LuaHTML)).GetList()
+	for _, item := range list {
 		names = append(names, item.Name)
-		assert.Equal(t, ver, item.Ver)
 	}
 	sort.Strings(names)
 	sort.Strings(exp)

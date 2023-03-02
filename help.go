@@ -4,6 +4,8 @@ import (
 	"os"
 )
 
+var osExit = os.Exit
+
 func cmdHelp(rc int, msgs ...interface{}) {
 	// print passed messages
 	if len(msgs) > 0 {
@@ -35,5 +37,5 @@ Usage:
   lenv use-lj <version>               Use a <version> of luajit
   lenv use-rocks <version>            Use a <version> of luajit
 `)
-	os.Exit(rc)
+	osExit(rc)
 }
