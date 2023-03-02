@@ -195,6 +195,36 @@ func (vers *Versions) GetItem(ver string) *VerItem {
 	return vers.dict[ver]
 }
 
+var reSemVerWithoutTag = regexp.MustCompile(`^\d+[.]\d+([.]\d+)?$`)
+
+func (vers *Versions) PickItem(ver string) *VerItem {
+	if item := vers.GetItem(ver); item != nil {
+		return item
+	}
+
+	items := VerItems{}
+	for _, item := range vers.dict {
+		if reSemVerWithoutTag.Match([]byte(item.Ver)) {
+			items = append(items, item)
+		}
+	}
+	items.Sort()
+
+	// pick a latest version
+	if ver == "latest" {
+		return items[0]
+	}
+
+	// pick a latest version that matches the prefix
+	for _, item := range items {
+		if strings.HasPrefix(item.Ver, ver) {
+			return item
+		}
+	}
+
+	return nil
+}
+
 func (vers *Versions) GetList() (VerItems, int) {
 	vitems := VerItems{}
 	maxlen := 0

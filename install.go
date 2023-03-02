@@ -331,12 +331,13 @@ func cmdInstall(cfg *TargetConfig, opts []string) {
 
 	ver := opts[0]
 	opts = opts[1:]
-	item := vers.GetItem(ver)
+	item := vers.PickItem(ver)
 	if item == nil {
 		fatalf("%s version %q does not defined in %q", cfg.Name, ver, cfg.VersionFile)
 	} else if item.Ext != ".tar.gz" {
 		fatalf("unsupported media-type %q", item.Name)
 	}
+	ver = item.Ver
 	url := cfg.DownloadURL + filepath.Clean(item.Name)
 
 	printf("install %q", item.Ver)

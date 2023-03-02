@@ -138,6 +138,45 @@ func Test_Versions_GetItem(t *testing.T) {
 	assert.Nilf(t, vers.GetItem(invalid_ver), "not nil")
 }
 
+func Test_Versions_PickItem(t *testing.T) {
+	vers := NewVersions()
+	for _, ver := range []string{
+		"2.0.0", "2.1.5", "2.1.6", "2.1.9", "2.2.0",
+		"5.1", "5.1.5", "5.1.15", "5.2.0-rc",
+	} {
+		assert.Truef(t, vers.Add("", ver, "", ""), "not true")
+	}
+
+	// test that pick a latest item except tagged versions
+	item := vers.PickItem("latest")
+	assert.NotNil(t, item, "nil")
+	assert.Equal(t, "5.1.15", item.Ver)
+
+	// test that pick a item that matches the version
+	item = vers.PickItem("5.1")
+	assert.NotNil(t, item, "nil")
+	assert.Equal(t, "5.1", item.Ver)
+
+	item = vers.PickItem("5.2.0-rc")
+	assert.NotNil(t, item, "nil")
+	assert.Equal(t, "5.2.0-rc", item.Ver)
+
+	// test that pick a item that matches the version
+	item = vers.PickItem("5.1.")
+	assert.NotNil(t, item, "nil")
+	assert.Equal(t, "5.1.15", item.Ver)
+
+	// test that pick a latest item in major ver 2
+	item = vers.PickItem("2")
+	assert.NotNil(t, item, "nil")
+	assert.Equal(t, "2.2.0", item.Ver)
+
+	// test that pick a latest item in major ver 2 and minor ver 1
+	item = vers.PickItem("2.1")
+	assert.NotNil(t, item, "nil")
+	assert.Equal(t, "2.1.9", item.Ver)
+}
+
 func Test_Versions_GetList(t *testing.T) {
 	vers := NewVersions()
 	maxlen := 0
