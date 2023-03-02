@@ -9,21 +9,16 @@ import (
 	"regexp"
 )
 
-type ParseFunc func(body []byte) List
+type ParseFunc func(body []byte) *Versions
 
 var (
-	ReSemVer      = regexp.MustCompile(`(?s)^\d+(?:\.\d+){1,2}`)
 	ReLuaRocksVer = regexp.MustCompile(`(?si)href="(luarocks-([^"]+?)\.tar\.gz).*?href="(luarocks-[^"]+?\.tar\.gz\.asc)"`)
 	ReLuaJitVer   = regexp.MustCompile(`(?i)([0-9a-f]+?)\s+(LuaJIT-([^\s]+?)\.tar\.gz)`)
 	ReLuaVer      = regexp.MustCompile(`(?si)<tr>\s*<td class="name"><a href="(lua-([^"]+?)\.tar\.gz).+?class="sum">([0-9a-f]+)</td>\s*</tr>`)
 )
 
-func isSemVer(ver string) bool {
-	return ReSemVer.MatchString(ver)
-}
-
-func parseLuaRocksVers(body []byte) List {
-	list := make(List)
+func parseLuaRocksVers(body []byte) *Versions {
+	vers := NewVersions()
 	for _, m := range ReLuaRocksVer.FindAllSubmatch(body, -1) {
 		if !bytes.HasPrefix(m[3], m[1]) {
 			continue
@@ -31,55 +26,40 @@ func parseLuaRocksVers(body []byte) List {
 		name := string(m[1])
 		ver := string(m[2])
 		sum := "pgp:" + string(m[3])
-		if isSemVer(ver) {
-			list[ver] = &ListItem{
-				Name: name,
-				Ver:  ver,
-				Sum:  sum,
-				Ext:  ".tar.gz",
-			}
+		if !vers.Add(name, ver, sum, ".tar.gz") {
+			printf("ignore unsupported version: %q", name)
 		}
 	}
 
-	return list
+	return vers
 }
 
-func parseLuaJitVers(body []byte) List {
-	list := make(List)
+func parseLuaJitVers(body []byte) *Versions {
+	vers := NewVersions()
 	for _, m := range ReLuaJitVer.FindAllSubmatch(body, -1) {
 		sum := "sha256:" + string(m[1])
 		name := string(m[2])
 		ver := string(m[3])
-		if isSemVer(ver) {
-			list[ver] = &ListItem{
-				Name: name,
-				Ver:  ver,
-				Sum:  sum,
-				Ext:  ".tar.gz",
-			}
+		if !vers.Add(name, ver, sum, ".tar.gz") {
+			printf("ignore unsupported version: %q", name)
 		}
 	}
 
-	return list
+	return vers
 }
 
-func parseLuaVers(body []byte) List {
-	list := make(List)
+func parseLuaVers(body []byte) *Versions {
+	vers := NewVersions()
 	for _, m := range ReLuaVer.FindAllSubmatch(body, -1) {
 		name := string(m[1])
 		ver := string(m[2])
 		sum := "sha256:" + string(m[3])
-		if isSemVer(ver) {
-			list[ver] = &ListItem{
-				Name: name,
-				Ver:  ver,
-				Sum:  sum,
-				Ext:  ".tar.gz",
-			}
+		if !vers.Add(name, ver, sum, ".tar.gz") {
+			printf("ignore unsupported version: %q", name)
 		}
 	}
 
-	return list
+	return vers
 }
 
 func cmdFetch() {
@@ -107,25 +87,16 @@ func cmdFetch() {
 			eprintf("failed to read body: %v", err)
 		}
 
-		list := target.parse(b)
-		if err = writeVersionFile(target.cfg.VersionFile, list); err != nil {
+		vers := target.parse(b)
+		if err = vers.WriteFile(target.cfg.VersionFile); err != nil {
 			eprintf("failed to write version file: %v", err)
 		}
 
-		vers := []string{}
-		maxlen := 0
-		for ver := range list {
-			if len(ver) > maxlen {
-				maxlen = len(ver)
-			}
-			vers = append(vers, ver)
-		}
-		sortVersions(vers)
+		items, maxlen := vers.GetList()
 		format := fmt.Sprintf("%%-%ds    %%s", maxlen)
-
-		for _, ver := range vers {
-			url := target.cfg.DownloadURL + filepath.Clean(list[ver].Name)
-			printf(format, ver, url)
+		for _, item := range items {
+			url := target.cfg.DownloadURL + filepath.Clean(item.Name)
+			printf(format, item.Ver, url)
 		}
 
 		printf("")

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -214,52 +212,6 @@ func writeFile(file string, perm os.FileMode, src io.Reader) error {
 	}
 
 	return nil
-}
-
-type ListItem struct {
-	Name string
-	Ver  string
-	Sum  string
-	Ext  string
-}
-
-type List map[string]*ListItem
-
-func writeVersionFile(file string, list List) error {
-	if b, err := json.MarshalIndent(list, "", "  "); err != nil {
-		return err
-	} else if err = writeFile(file, 0, bytes.NewReader(b)); err != nil {
-		return err
-	}
-	return nil
-}
-
-func readVersionFile(file string) (List, error) {
-	f, err := os.Open(file)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	b, err := ioutil.ReadAll(f)
-	if err != nil {
-		return nil, err
-	}
-
-	list := make(List)
-	if err = json.Unmarshal(b, &list); err != nil {
-		return nil, err
-	}
-	return list, nil
-}
-
-func getVerInfo(file string, ver string) (*ListItem, error) {
-	if list, err := readVersionFile(file); err != nil {
-		return nil, fmt.Errorf("failed to read version file: %w", err)
-	} else if item, ok := list[ver]; ok {
-		return item, nil
-	}
-	return nil, nil
 }
 
 func hasRequiredDirs() bool {

@@ -12,12 +12,15 @@ func cmdUse(cfg *TargetConfig, opts []string) {
 	if len(opts) == 0 {
 		cmdHelp(1, "no version specified")
 	}
-	ver := opts[0]
 
-	item, err := getVerInfo(cfg.VersionFile, ver)
+	vers, err := NewVersionsFromFile(cfg.VersionFile)
 	if err != nil {
-		fatalf("failed to get version info: %v", err)
-	} else if item == nil {
+		fatalf("failed to read version file %q: %v", cfg.VersionFile, err)
+	}
+
+	ver := opts[0]
+	item := vers.GetItem(ver)
+	if item == nil {
 		fatalf("%s version %q does not defined in %q", cfg.Name, ver, cfg.VersionFile)
 	}
 

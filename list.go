@@ -48,14 +48,14 @@ func listRocks(luadir string) {
 	maxlen := 0
 	for _, info := range infos {
 		ver := info.Name()
-		if isSemVer(ver) {
+		if IsSemVer(ver) {
 			vers = append(vers, ver)
 			if len(ver) > maxlen {
 				maxlen = len(ver)
 			}
 		}
 	}
-	sortVersions(vers)
+	SortVersions(vers)
 
 	if len(vers) > 0 {
 		format := fmt.Sprintf("    %%s %%-%ds", maxlen)
@@ -87,18 +87,21 @@ func cmdList() {
 			continue
 		}
 
-		vers := []string{}
-		dirs := []string{}
+		vers, err := NewVersionsFromFile(cfg.VersionFile)
+		if err != nil {
+			eprintf("failed to read version file %q: %v", cfg.VersionFile, err)
+			continue
+		}
+
+		inst_vers := []string{}
+		inst_dirs := []string{}
 		maxlen := 0
 		for _, info := range infos {
 			ver := info.Name()
 			dir := filepath.Join(cfg.RootDir, ver)
 
 			// verify version
-			if item, err := getVerInfo(cfg.VersionFile, ver); err != nil {
-				eprintf("failed to get version info: %v", err)
-				break
-			} else if item == nil {
+			if item := vers.GetItem(ver); item == nil {
 				// ignore unknown file/directory
 				eprintf("ignore unknown version: %s (%q)", ver, dir)
 				continue
@@ -109,13 +112,13 @@ func cmdList() {
 				maxlen = len(ver)
 			}
 
-			dirs = append(dirs, dir)
-			vers = append(vers, ver)
+			inst_dirs = append(inst_dirs, dir)
+			inst_vers = append(inst_vers, ver)
 		}
 
 		format := fmt.Sprintf("%%-%ds (%%s)", maxlen)
-		for i, v := range vers {
-			dir := dirs[i]
+		for i, v := range inst_vers {
+			dir := inst_dirs[i]
 			if dir == CurrentUsed {
 				printf(format+" (used)", v, dir)
 			} else {
