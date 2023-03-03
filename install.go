@@ -382,4 +382,7 @@ func CmdInstall(cfg *TargetConfig, opts []string) {
 
 	printf("")
 	printf("%s version %s (%q) has been installed.", cfg.Name, ver, instdir)
+
+	// automatically use the installed version
+	UseInstalledVersion(cfg, ver)
 }

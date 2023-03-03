@@ -26,9 +26,9 @@ Usage:
   lenv fetch                          Fetch remote versions
   lenv vers                           List available versions
   lenv ls                             List installed versions
-  lenv install <version> <opt...>     Install a version <version> of lua
-  lenv install-lj <version> <opt...>  Install a version <version> of luajit
-  lenv install-rocks <version>        Install a version <version> of lurocks in
+  lenv install <version> <opt...>     Install and use a <version> of lua
+  lenv install-lj <version> <opt...>  Install and use a <version> of luajit
+  lenv install-rocks <version>        Install and use a <version> of lurocks in
                                       current lua environment
   lenv uninstall <version>            Uninstall a version <version> of lua
   lenv uninstall-lj <version>         Uninstall a version <version> of luajit
