@@ -12,7 +12,7 @@ func Test_cmdPath(t *testing.T) {
 	defer stdout.CloseAll()
 
 	// test that cmdPath outputs PATH, LUA_PATH and LUA_CPATH to stdout
-	cmdPath()
+	CmdPath()
 	var b bytes.Buffer
 	if _, err := b.ReadFrom(stdout.Close()); err != nil {
 		t.Fatalf("failed to read from pipe: %v", err)

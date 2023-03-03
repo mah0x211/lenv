@@ -13,7 +13,7 @@ func Test_cmdHelp(t *testing.T) {
 	defer stdout.CloseAll()
 
 	// test that cmdHelp output to stdout and exit with rc
-	cmdHelp(123, "message")
+	CmdHelp(123, "message")
 	stdout.Close()
 	exit.Close()
 	assert.Equalf(t, 123, exit.Code, "not equal")

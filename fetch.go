@@ -62,7 +62,7 @@ func parseLuaVers(body []byte) *Versions {
 	return vers
 }
 
-func cmdFetch() {
+func CmdFetch() {
 	for _, target := range []struct {
 		cfg   *TargetConfig
 		parse ParseFunc

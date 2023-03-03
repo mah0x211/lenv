@@ -6,7 +6,7 @@ import (
 
 var osExit = os.Exit
 
-func cmdHelp(rc int, msgs ...interface{}) {
+func CmdHelp(rc int, msgs ...interface{}) {
 	// print passed messages
 	if len(msgs) > 0 {
 		fmtstr, ok := msgs[0].(string)

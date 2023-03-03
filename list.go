@@ -76,7 +76,7 @@ func listRocks(luadir string) {
 	}
 }
 
-func cmdList() {
+func CmdList() {
 	for _, cfg := range []*TargetConfig{
 		LuaCfg, LuaJitCfg,
 	} {

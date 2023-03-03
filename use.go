@@ -7,10 +7,10 @@ import (
 	"strings"
 )
 
-func cmdUse(cfg *TargetConfig, opts []string) {
+func CmdUse(cfg *TargetConfig, opts []string) {
 	// check target version
 	if len(opts) == 0 {
-		cmdHelp(1, "no version specified")
+		CmdHelp(1, "no version specified")
 	}
 
 	vers, err := NewVersionsFromFile(cfg.VersionFile)

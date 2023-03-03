@@ -318,10 +318,10 @@ func installLua(instdir string, opts []string) error {
 	return doExec("make", "install", "INSTALL_TOP="+instdir)
 }
 
-func cmdInstall(cfg *TargetConfig, opts []string) {
+func CmdInstall(cfg *TargetConfig, opts []string) {
 	// check target version
 	if len(opts) == 0 {
-		cmdHelp(1, "no version specified")
+		CmdHelp(1, "no version specified")
 	}
 
 	vers, err := NewVersionsFromFile(cfg.VersionFile)

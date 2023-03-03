@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func cmdPath() {
+func CmdPath() {
 	printf(`
 #
 # please add the following lenv settings to your environment

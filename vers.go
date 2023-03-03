@@ -238,7 +238,7 @@ func (vers *Versions) GetList() (VerItems, int) {
 	return vitems, maxlen
 }
 
-func cmdVers() {
+func CmdVers() {
 	for _, cfg := range []*TargetConfig{
 		LuaCfg, LuaJitCfg, LuaRocksCfg,
 	} {

@@ -1,6 +1,6 @@
 package main
 
-func cmdSetup() {
+func CmdSetup() {
 	printf("creating the required directories...")
 	// create required directories
 	for _, dir := range []string{
