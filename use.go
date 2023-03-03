@@ -7,23 +7,7 @@ import (
 	"strings"
 )
 
-func cmdUse(cfg *TargetConfig, opts []string) {
-	// check target version
-	if len(opts) == 0 {
-		cmdHelp(1, "no version specified")
-	}
-
-	vers, err := NewVersionsFromFile(cfg.VersionFile)
-	if err != nil {
-		fatalf("failed to read version file %q: %v", cfg.VersionFile, err)
-	}
-
-	ver := opts[0]
-	item := vers.GetItem(ver)
-	if item == nil {
-		fatalf("%s version %q does not defined in %q", cfg.Name, ver, cfg.VersionFile)
-	}
-
+func UseInstalledVersion(cfg *TargetConfig, ver string) {
 	// change workdir
 	wd := LenvDir
 	dst := CurrentDir
@@ -33,7 +17,8 @@ func cmdUse(cfg *TargetConfig, opts []string) {
 		dst = filepath.Join(wd, "lua_modules")
 		suffix = "lua_modules"
 	}
-	if err = os.Chdir(wd); err != nil {
+
+	if err := os.Chdir(wd); err != nil {
 		fatalf("failed to chdir: %v", err)
 	}
 
@@ -62,4 +47,23 @@ func cmdUse(cfg *TargetConfig, opts []string) {
 	}
 
 	fatalf("%s version %q is not installed", cfg.Name, ver)
+}
+
+func CmdUse(cfg *TargetConfig, opts []string) {
+	// check target version
+	if len(opts) == 0 {
+		CmdHelp(1, "no version specified")
+	}
+
+	vers, err := NewVersionsFromFile(cfg.VersionFile)
+	if err != nil {
+		fatalf("failed to read version file %q: %v", cfg.VersionFile, err)
+	}
+
+	ver := opts[0]
+	if vers.GetItem(ver) == nil {
+		fatalf("%s version %q does not defined in %q", cfg.Name, ver, cfg.VersionFile)
+	}
+
+	UseInstalledVersion(cfg, ver)
 }

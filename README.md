@@ -37,9 +37,9 @@ Usage:
   lenv fetch                          Fetch remote versions
   lenv vers                           List available versions
   lenv ls                             List installed versions
-  lenv install <version> <opt...>     Install a version <version> of lua
-  lenv install-lj <version> <opt...>  Install a version <version> of luajit
-  lenv install-rocks <version>        Install a version <version> of lurocks in
+  lenv install <version> <opt...>     Install and use a <version> of lua
+  lenv install-lj <version> <opt...>  Install and use a <version> of luajit
+  lenv install-rocks <version>        Install and use a <version> of lurocks in
                                       current lua environment
   lenv uninstall <version>            Uninstall a version <version> of lua
   lenv uninstall-lj <version>         Uninstall a version <version> of luajit
@@ -66,8 +66,6 @@ the following example are installing the Lua 5.1.5.
 ```sh
 $ lenv install 5.1.5 macosx
 ...snip...
-$ lenv use 5.1.5
-use lua version 5.1.5 ("lua/5.1.5")
 $ lua -v
 Lua 5.1.5  Copyright (C) 1994-2012 Lua.org, PUC-Rio
 ```
@@ -76,7 +74,7 @@ the following example are installing the LuaJIT 2.0.4.
 
 ```sh
 $ lenv install-lj 2.0.4
-$ lenv use-lj 2.0.4
+...snip...
 $ lua -v
 LuaJIT 2.0.4 -- Copyright (C) 2005-2015 Mike Pall. http://luajit.org/
 ```
@@ -88,8 +86,6 @@ $ lenv use 5.1.5
 use lua version 5.1.5 ("lua/5.1.5")
 $ lenv install-rocks 3.5.0
 ...snip...
-$ lenv use-rocks 3.5.0
-use luarocks version 3.5.0 ("luarocks/3.5.0/lua_modules")
 $ luarocks version
 /Users/mah/.lenv/current/lua_modules/bin/luarocks 3.5.0
 LuaRocks main command-line interface

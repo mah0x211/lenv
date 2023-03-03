@@ -236,7 +236,7 @@ func checkInitialized() {
 ERROR: the required directory does not exists.
        please run 'lenv setup' before use.
 `)
-		cmdHelp(1)
+		CmdHelp(1)
 	}
 }
 
@@ -250,66 +250,66 @@ func start() {
 	argv := os.Args[1:]
 	if len(argv) == 0 {
 		checkInitialized()
-		cmdHelp(0)
+		CmdHelp(0)
 	} else if argv[0] != "setup" {
 		checkInitialized()
 	}
 
 	switch argv[0] {
 	case "help":
-		cmdHelp(0)
+		CmdHelp(0)
 
 	case "setup":
-		cmdSetup()
+		CmdSetup()
 
 	case "path":
-		cmdPath()
+		CmdPath()
 
 	case "fetch":
-		cmdFetch()
+		CmdFetch()
 
 	case "vers":
-		cmdVers()
+		CmdVers()
 
 	case "ls":
-		cmdList()
+		CmdList()
 
 	case "install":
-		cmdInstall(LuaCfg, argv[1:])
+		CmdInstall(LuaCfg, argv[1:])
 
 	case "install-lj":
 		argv = argv[1:]
 		if runtime.GOOS == "darwin" {
 			argv = append(argv, "MACOSX_DEPLOYMENT_TARGET=10.6")
 		}
-		cmdInstall(LuaJitCfg, argv)
+		CmdInstall(LuaJitCfg, argv)
 
 	case "install-rocks":
 		checkLuaRocksRootDir()
-		cmdInstall(LuaRocksCfg, argv[1:])
+		CmdInstall(LuaRocksCfg, argv[1:])
 
 	case "uninstall":
-		cmdUninstall(LuaCfg, argv[1:])
+		CmdUninstall(LuaCfg, argv[1:])
 
 	case "uninstall-lj":
-		cmdUninstall(LuaJitCfg, argv[1:])
+		CmdUninstall(LuaJitCfg, argv[1:])
 
 	case "uninstall-rocks":
 		checkLuaRocksRootDir()
-		cmdUninstall(LuaRocksCfg, argv[1:])
+		CmdUninstall(LuaRocksCfg, argv[1:])
 
 	case "use":
-		cmdUse(LuaCfg, argv[1:])
+		CmdUse(LuaCfg, argv[1:])
 
 	case "use-lj":
-		cmdUse(LuaJitCfg, argv[1:])
+		CmdUse(LuaJitCfg, argv[1:])
 
 	case "use-rocks":
 		checkLuaRocksRootDir()
-		cmdUse(LuaRocksCfg, argv[1:])
+		CmdUse(LuaRocksCfg, argv[1:])
 
 	default:
-		cmdHelp(1, "unknown command %q", argv[0])
+		CmdHelp(1, "unknown command %q", argv[0])
 	}
 }
 
