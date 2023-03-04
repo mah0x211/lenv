@@ -137,22 +137,6 @@ func createSymlink(oldname, newname string) error {
 	return os.Rename(tmpName, newname)
 }
 
-var ErrNotSymlink = fmt.Errorf("not a symlink")
-
-func evalSymlink(file string) (string, error) {
-	if mode, err := getFileMode(file); err != nil {
-		return "", err
-	} else if mode == 0 {
-		return "", nil
-	} else if mode&os.ModeSymlink == 0 {
-		return "", ErrNotSymlink
-	} else if pathname, err := filepath.EvalSymlinks(file); err != nil {
-		return "", err
-	} else {
-		return pathname, nil
-	}
-}
-
 func readSymlink(file string) (string, error) {
 	if mode, err := getFileMode(file); err != nil {
 		return "", err
@@ -313,7 +297,23 @@ func start() {
 	}
 }
 
-func init() {
+var ErrNotSymlink = fmt.Errorf("not a symlink")
+
+func evalSymlink(file string) (string, error) {
+	if mode, err := getFileMode(file); err != nil {
+		return "", err
+	} else if mode == 0 {
+		return "", nil
+	} else if mode&os.ModeSymlink == 0 {
+		return "", ErrNotSymlink
+	} else if pathname, err := filepath.EvalSymlinks(file); err != nil {
+		return "", err
+	} else {
+		return pathname, nil
+	}
+}
+
+func ResolveCurrentDir() {
 	abortf := func(format string, v ...interface{}) {
 		eprintf(format, v...)
 		os.Exit(1)
@@ -323,8 +323,10 @@ func init() {
 	if dir, err := evalSymlink(CurrentDir); err != nil {
 		if errors.Is(err, ErrNotSymlink) {
 			abortf("%q is not symlink.\nplease remove it yourself", CurrentDir)
+		} else if !os.IsNotExist(err) {
+			abortf("failed to evalSymlink(): %#v", err)
 		}
-		abortf("failed to evalSymlink(): %v", err)
+		os.Remove(CurrentDir)
 	} else if dir != "" {
 		if ok, err := isDir(dir); err != nil {
 			abortf("failed to isDir(): %v", err)
@@ -343,6 +345,10 @@ func init() {
 			}
 		}
 	}
+}
+
+func init() {
+	ResolveCurrentDir()
 }
 
 func main() {
