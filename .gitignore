@@ -18,3 +18,5 @@ dist/
 
 # ignore _ prefixed file and directory
 _*
+
+dist/
