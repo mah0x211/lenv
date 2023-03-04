@@ -70,6 +70,10 @@ func errorf(format string, v ...interface{}) error {
 	return fmt.Errorf("[%s:%s:%d] "+format, append([]interface{}{file, fname, line}, v...)...)
 }
 
+func print(format string, v ...interface{}) {
+	fmt.Printf(format, v...)
+}
+
 func printf(format string, v ...interface{}) {
 	fmt.Printf(format+"\n", v...)
 }
@@ -224,7 +228,7 @@ ERROR: the required directory does not exists.
 	}
 }
 
-func checkLuaRocksRootDir() {
+func CheckLuaRocksRootDir() {
 	if LuaRocksCfg.RootDir == "" {
 		fatalf("%q does not exist.\nplease run `lenv use <ver>` or `lenv use-lj <ver>` before installing or uninstalling luarocks", CurrentDir)
 	}
@@ -269,7 +273,7 @@ func start() {
 		CmdInstall(LuaJitCfg, argv)
 
 	case "install-rocks":
-		checkLuaRocksRootDir()
+		CheckLuaRocksRootDir()
 		CmdInstall(LuaRocksCfg, argv[1:])
 
 	case "uninstall":
@@ -279,7 +283,7 @@ func start() {
 		CmdUninstall(LuaJitCfg, argv[1:])
 
 	case "uninstall-rocks":
-		checkLuaRocksRootDir()
+		CheckLuaRocksRootDir()
 		CmdUninstall(LuaRocksCfg, argv[1:])
 
 	case "use":
@@ -289,7 +293,7 @@ func start() {
 		CmdUse(LuaJitCfg, argv[1:])
 
 	case "use-rocks":
-		checkLuaRocksRootDir()
+		CheckLuaRocksRootDir()
 		CmdUse(LuaRocksCfg, argv[1:])
 
 	default:

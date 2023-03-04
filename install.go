@@ -227,48 +227,6 @@ func untarGz(dir string, data io.Reader) (string, error) {
 	return rootdir, nil
 }
 
-func download(url string) (io.Reader, error) {
-	file := filepath.Join(SrcDir, filepath.Base(url))
-	// open cached file if exists
-	if f, err := openFile(file); err != nil {
-		return nil, err
-	} else if f != nil {
-		defer f.Close()
-		b, err := ioutil.ReadAll(f)
-		if err != nil {
-			return nil, err
-		}
-		return bytes.NewReader(b), nil
-	}
-
-	// download from url
-	rsp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	} else if rsp.StatusCode != 200 {
-		return nil, fmt.Errorf("failed to get %q: %s", url, rsp.Status)
-	}
-	defer rsp.Body.Close()
-
-	// create cache file
-	f, err := createFile(file, 0)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	b, err := ioutil.ReadAll(rsp.Body)
-	if err != nil {
-		os.Remove(file)
-		return nil, err
-	} else if _, err = f.Write(b); err != nil {
-		os.Remove(file)
-		return nil, err
-	}
-
-	return bytes.NewReader(b), nil
-}
-
 func installRocks(instdir string, cfg *TargetConfig) error {
 	luadir := filepath.Dir(cfg.RootDir)
 	if err := doExec("./configure", "--help"); err != nil {
@@ -318,48 +276,104 @@ func installLua(instdir string, opts []string) error {
 	return doExec("make", "install", "INSTALL_TOP="+instdir)
 }
 
-func CmdInstall(cfg *TargetConfig, opts []string) {
-	// check target version
-	if len(opts) == 0 {
-		CmdHelp(1, "no version specified")
+func openCachedFile(url string) (io.Reader, error) {
+	file := filepath.Join(SrcDir, filepath.Base(url))
+	// open cached file if exists
+	if f, err := openFile(file); err != nil {
+		return nil, err
+	} else if f != nil {
+		defer f.Close()
+		b, err := ioutil.ReadAll(f)
+		if err != nil {
+			return nil, err
+		}
+		return bytes.NewReader(b), nil
 	}
+	return nil, nil
+}
 
-	vers, err := NewVersionsFromFile(cfg.VersionFile)
+func extractCachedFile(tmpdir, url string) (string, error) {
+	data, err := openCachedFile(url)
 	if err != nil {
-		fatalf("failed to read version file %q: %v", cfg.VersionFile, err)
+		return "", fmt.Errorf("open cached file error: %w", err)
+	} else if data == nil {
+		return "", nil
+	} else if dir, err := untarGz(tmpdir, data); err != nil {
+		return "", fmt.Errorf("uncompress the cached file error: %w", err)
+	} else {
+		return dir, nil
+	}
+}
+
+func download(url string) (io.Reader, error) {
+	file := filepath.Join(SrcDir, filepath.Base(url))
+
+	// download from url
+	rsp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	} else if rsp.StatusCode != 200 {
+		return nil, fmt.Errorf("failed to get %q: %s", url, rsp.Status)
+	}
+	defer rsp.Body.Close()
+
+	// create cache file
+	f, err := createFile(file, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	b, err := ioutil.ReadAll(rsp.Body)
+	if err != nil {
+		os.Remove(file)
+		return nil, err
+	} else if _, err = f.Write(b); err != nil {
+		os.Remove(file)
+		return nil, err
 	}
 
-	ver := opts[0]
-	opts = opts[1:]
-	item := vers.PickItem(ver)
-	if item == nil {
-		fatalf("%s version %q does not defined in %q", cfg.Name, ver, cfg.VersionFile)
-	} else if item.Ext != ".tar.gz" {
-		fatalf("unsupported media-type %q", item.Name)
-	}
-	ver = item.Ver
-	url := cfg.DownloadURL + filepath.Clean(item.Name)
+	return bytes.NewReader(b), nil
+}
 
-	printf("install %q", item.Ver)
-	printf("download %q", url)
+func extractDownloadedFile(tmpdir, url string) (string, error) {
 	data, err := download(url)
 	if err != nil {
-		fatalf("failed to download %q: %v", item.Name, err)
-	}
-
-	if dir, err := ioutil.TempDir(os.TempDir(), "lenv_tmp_"); err != nil {
-		fatalf("failed to create tempdir: %v", err)
+		return "", fmt.Errorf("download error: %w", err)
+	} else if dir, err := untarGz(tmpdir, data); err != nil {
+		return "", fmt.Errorf("uncompress the downloadeded file error: %w", err)
 	} else {
-		defer os.RemoveAll(dir)
-		printf("extract %s to %s", item.Name, dir)
-		if dir, err = untarGz(dir, data); err != nil {
-			fatalf("failed to uncompress file %q: %v", item.Name, err)
-		} else if err = os.Chdir(dir); err != nil {
-			fatalf("failed to chdir(): %v", err)
+		return dir, nil
+	}
+}
+
+func doInstall(cfg *TargetConfig, item *VerItem, opts []string) {
+	printf("install %q", item.Ver)
+
+	url := cfg.DownloadURL + filepath.Clean(item.Name)
+	tmpdir, err := ioutil.TempDir(os.TempDir(), "lenv_tmp_")
+	if err != nil {
+		fatalf("failed to create tempdir: %v", err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	dir, err := extractCachedFile(tmpdir, url)
+	if dir != "" {
+		printf("use cached file")
+	} else {
+		if err != nil {
+			printf("failed to extract cached file: %v", err)
+		}
+		if dir, err = extractDownloadedFile(dir, url); err != nil {
+			fatalf("failed to extract downloaded file: %v", err)
 		}
 	}
+	printf("chdir %q", dir)
+	if err = os.Chdir(dir); err != nil {
+		fatalf("failed to chdir(): %v", err)
+	}
 
-	instdir := filepath.Join(cfg.RootDir, ver)
+	instdir := filepath.Join(cfg.RootDir, item.Ver)
 	printf("remove old directory: %s", instdir)
 	if err = os.RemoveAll(instdir); err != nil {
 		fatalf("failed to os.RemoveAll(): %v", err)
@@ -377,12 +391,64 @@ func CmdInstall(cfg *TargetConfig, opts []string) {
 	}
 
 	if err != nil {
-		fatalf("failed to install %s version %s: %v", cfg.Name, ver, err)
+		fatalf("failed to install %s version %s: %v", cfg.Name, item.Ver, err)
 	}
-
-	printf("")
-	printf("%s version %s (%q) has been installed.", cfg.Name, ver, instdir)
+	printf("\n%s version %s (%q) has been installed.", cfg.Name, item.Ver, instdir)
 
 	// automatically use the installed version
-	UseInstalledVersion(cfg, ver)
+	UseInstalledVersion(cfg, item.Ver)
+}
+
+func pickTargetVersionItem(cfg *TargetConfig, ver string) *VerItem {
+	print("check %s version %q definition ... ", cfg.Name, ver)
+	vers, err := NewVersionsFromFile(cfg.VersionFile)
+	if err != nil {
+		fatalf("failed to read version file %q: %v", cfg.VersionFile, err)
+	}
+
+	item := vers.PickItem(ver)
+	if item == nil {
+		printf("not found")
+		fatalf("%s version %q does not defined in %q\n%s", cfg.Name, ver, cfg.VersionFile, ListTargetVersions(cfg))
+	} else if item.Ext != ".tar.gz" {
+		fatalf("unsupported media-type %q", item.Name)
+	}
+	printf("found %q", item.Ver)
+
+	return item
+}
+
+func CmdInstall(cfg *TargetConfig, opts []string) {
+	// check target version
+	if len(opts) == 0 || (cfg != LuaRocksCfg && opts[0] == ":") {
+		CmdHelp(1, "no version specified")
+	}
+	ver := opts[0]
+
+	// check :<luarocks-version>
+	var rocksVer string
+	if cfg != LuaRocksCfg {
+		if delim := strings.Index(ver, ":"); delim != -1 {
+			rocksVer = ver[delim+1:]
+			ver = ver[:delim]
+		}
+	}
+
+	var verItem *VerItem
+	if len(ver) > 0 {
+		verItem = pickTargetVersionItem(cfg, ver)
+	}
+	var rocksItem *VerItem
+	if len(rocksVer) > 0 {
+		rocksItem = pickTargetVersionItem(LuaRocksCfg, rocksVer)
+	}
+
+	if verItem != nil {
+		doInstall(cfg, verItem, opts[1:])
+	}
+	if rocksItem != nil {
+		ResolveCurrentDir()
+		CheckLuaRocksRootDir()
+		doInstall(LuaRocksCfg, rocksItem, opts)
+	}
 }
