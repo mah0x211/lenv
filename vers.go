@@ -238,33 +238,38 @@ func (vers *Versions) GetList() (VerItems, int) {
 	return vitems, maxlen
 }
 
+func ListTargetVersions(cfg *TargetConfig) string {
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "list available %q versions:\n", cfg.Name)
+	vers, err := NewVersionsFromFile(cfg.VersionFile)
+	if err != nil {
+		fmt.Fprintf(&b, "failed to read version file %q: %v\n", cfg.VersionFile, err)
+	} else if items, maxlen := vers.GetList(); len(items) > 0 {
+		format := fmt.Sprintf("%%-%ds", maxlen)
+		ncols := 0
+		arr := []string{}
+		for _, item := range items {
+			v := fmt.Sprintf(format, item.Ver)
+			ncols += maxlen + 2
+			if ncols/80 > 0 {
+				fmt.Fprintf(&b, "%s\n", strings.Join(arr, "  "))
+				arr = arr[:0]
+				ncols = maxlen + 2
+			}
+			arr = append(arr, v)
+		}
+		fmt.Fprintf(&b, "%s\n", strings.Join(arr, "  "))
+	}
+
+	return b.String()
+}
+
 func CmdVers() {
 	for _, cfg := range []*TargetConfig{
 		LuaCfg, LuaJitCfg, LuaRocksCfg,
 	} {
-		printf("list available %q versions:", cfg.Name)
-		vers, err := NewVersionsFromFile(cfg.VersionFile)
-		if err != nil {
-			eprintf("failed to read version file %q: %v", cfg.VersionFile, err)
-		} else {
-			items, maxlen := vers.GetList()
-			format := fmt.Sprintf("%%-%ds", maxlen)
-			arr := []string{}
-			ncols := 0
-			for _, item := range items {
-				v := fmt.Sprintf(format, item.Ver)
-				ncols += maxlen + 2
-				if ncols/80 > 0 {
-					printf(strings.Join(arr, "  "))
-					arr = arr[:0]
-					ncols = maxlen + 2
-				}
-				arr = append(arr, v)
-			}
-			if len(arr) > 0 {
-				printf(strings.Join(arr, "  "))
-			}
-		}
-		printf("")
+		print(ListTargetVersions(cfg))
+		print("\n")
 	}
 }

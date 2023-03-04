@@ -41,12 +41,29 @@ Usage:
   lenv install-lj <version> <opt...>  Install and use a <version> of luajit
   lenv install-rocks <version>        Install and use a <version> of lurocks in
                                       current lua environment
-  lenv uninstall <version>            Uninstall a version <version> of lua
-  lenv uninstall-lj <version>         Uninstall a version <version> of luajit
-  lenv uninstall-rocks <version>      Uninstall a version <version> of luarocks
+
+  Note:
+    The <version> specifier of the install, install-lj and install-rocks commands
+    can be specified as follows;
+
+    lenv install latest ; that picks the latest version
+    lenv install 5      ; that picks the latest minor version and patch version
+    lenv install 5.4    ; that picks the latest patch version
+
+    In addition, the install and install-lj commands can be used to install
+    luarocks at the same time with the following <version> specifier;
+
+    lenv install latest:latest ; that picks the the latest version of lua and
+                               ; luarocks
+    lenv install :latest       ; that picks the the latest version of luarocks
+
+  lenv uninstall <version>            Uninstall a <version> of lua
+  lenv uninstall-lj <version>         Uninstall a <version> of luajit
+  lenv uninstall-rocks <version>      Uninstall a <version> of luarocks
   lenv use <version>                  Use a <version> of lua
   lenv use-lj <version>               Use a <version> of luajit
   lenv use-rocks <version>            Use a <version> of luajit
+
 ```
 
 **NOTE: you must run a `fetch` command at the first. that command will crawling the version files of `Lua`, `LuaJIT` and `LuaRocks` immediately.**
@@ -86,10 +103,23 @@ $ lenv use 5.1.5
 use lua version 5.1.5 ("lua/5.1.5")
 $ lenv install-rocks 3.5.0
 ...snip...
-$ luarocks version
+$ luarocks --version
 /Users/mah/.lenv/current/lua_modules/bin/luarocks 3.5.0
 LuaRocks main command-line interface
 ```
+
+the following example are installing the lua and luarocks at same time.
+
+```sh
+$ lenv install 5.1.:latest
+...snip...
+$ lua -v
+Lua 5.1.5  Copyright (C) 1994-2012 Lua.org, PUC-Rio
+$ luarocks --version
+/Users/mah/.lenv/current/lua_modules/bin/luarocks 3.9.2
+LuaRocks main command-line interface
+```
+
 
 ### Installation Locations 
 
