@@ -265,6 +265,25 @@ func ListTargetVersions(cfg *TargetConfig) string {
 	return b.String()
 }
 
+func PickTargetVersionItem(cfg *TargetConfig, ver string) *VerItem {
+	print("check %s version %q definition ... ", cfg.Name, ver)
+	vers, err := NewVersionsFromFile(cfg.VersionFile)
+	if err != nil {
+		fatalf("failed to read version file %q: %v", cfg.VersionFile, err)
+	}
+
+	item := vers.PickItem(ver)
+	if item == nil {
+		printf("not found")
+		fatalf("%s version %q does not defined in %q\n%s", cfg.Name, ver, cfg.VersionFile, ListTargetVersions(cfg))
+	} else if item.Ext != ".tar.gz" {
+		fatalf("unsupported media-type %q", item.Name)
+	}
+	printf("found %q", item.Ver)
+
+	return item
+}
+
 func CmdVers() {
 	for _, cfg := range []*TargetConfig{
 		LuaCfg, LuaJitCfg, LuaRocksCfg,

@@ -41,10 +41,12 @@ Usage:
   lenv install-lj <version> <opt...>  Install and use a <version> of luajit
   lenv install-rocks <version>        Install and use a <version> of lurocks in
                                       current lua environment
+  lenv use <version>                  Use a <version> of lua
+  lenv use-lj <version>               Use a <version> of luajit
+  lenv use-rocks <version>            Use a <version> of luajit
 
   Note:
-    The <version> specifier of the install, install-lj and install-rocks commands
-    can be specified as follows;
+    The <version> specifier of the above commands can be specified as follows;
 
     lenv install latest ; that picks the latest version
     lenv install 5      ; that picks the latest minor version and patch version
@@ -60,9 +62,6 @@ Usage:
   lenv uninstall <version>            Uninstall a <version> of lua
   lenv uninstall-lj <version>         Uninstall a <version> of luajit
   lenv uninstall-rocks <version>      Uninstall a <version> of luarocks
-  lenv use <version>                  Use a <version> of lua
-  lenv use-lj <version>               Use a <version> of luajit
-  lenv use-rocks <version>            Use a <version> of luajit
 
 ```
 
