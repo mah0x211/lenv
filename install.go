@@ -364,7 +364,7 @@ func doInstall(cfg *TargetConfig, item *VerItem, opts []string) {
 		if err != nil {
 			printf("failed to extract cached file: %v", err)
 		}
-		if dir, err = extractDownloadedFile(dir, url); err != nil {
+		if dir, err = extractDownloadedFile(tmpdir, url); err != nil {
 			fatalf("failed to extract downloaded file: %v", err)
 		}
 	}
