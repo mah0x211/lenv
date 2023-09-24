@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -120,7 +119,7 @@ func mkdir(dirname string) error {
 
 func createSymlink(oldname, newname string) error {
 	var tmpName string
-	if f, err := ioutil.TempFile("./", "tmp_symlink_*"); err != nil {
+	if f, err := os.CreateTemp("./", "tmp_symlink_*"); err != nil {
 		fatalf("failed to tempfile(): %v", err)
 	} else {
 		f.Close()

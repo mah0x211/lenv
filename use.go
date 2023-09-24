@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,7 +27,7 @@ func UseInstalledVersion(cfg *TargetConfig, ver string) {
 		rootdir = filepath.Clean("./" + rootdir)
 	}
 
-	infos, err := ioutil.ReadDir(rootdir)
+	infos, err := os.ReadDir(rootdir)
 	if err != nil {
 		fatalf("failed to readdir: %v", err)
 	}

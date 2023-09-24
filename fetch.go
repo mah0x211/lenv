@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"path/filepath"
 	"regexp"
@@ -82,7 +82,7 @@ func CmdFetch() {
 		}
 		defer rsp.Body.Close()
 
-		b, err := ioutil.ReadAll(rsp.Body)
+		b, err := io.ReadAll(rsp.Body)
 		if err != nil {
 			eprintf("failed to read body: %v", err)
 		}

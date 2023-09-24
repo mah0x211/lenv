@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 )
@@ -32,9 +31,9 @@ func (f *FakeStdout) CloseAll() {
 }
 
 func NewFakeStdout(t *testing.T) *FakeStdout {
-	file, err := ioutil.TempFile(".", "fakeio.*.txt")
+	file, err := os.CreateTemp(".", "fakeio.*.txt")
 	if err != nil {
-		t.Fatalf("failed to ioutil.TempFile(): %v", err)
+		t.Fatalf("failed to os.CreateTemp(): %v", err)
 	}
 
 	stdout := os.Stdout

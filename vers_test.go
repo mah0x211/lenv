@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -60,8 +59,6 @@ var LuaRocksVers = []string{
 }
 
 func Test_SortVersions(t *testing.T) {
-
-	rand.Seed(time.Now().UnixNano())
 	for _, list := range [][]string{
 		LuaVers, LuaJitVers, LuaRocksVers,
 	} {
@@ -76,7 +73,6 @@ func Test_SortVersions(t *testing.T) {
 }
 
 func Test_VerItems_Sort(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
 	for _, list := range [][]string{
 		LuaVers, LuaJitVers, LuaRocksVers,
 	} {
