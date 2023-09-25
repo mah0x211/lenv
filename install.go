@@ -9,21 +9,9 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
-
-func doExecEx(name string, stdout, stderr io.Writer, argv ...string) error {
-	cmd := exec.Command(name, argv...)
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	return cmd.Run()
-}
-
-func doExec(name string, argv ...string) error {
-	return doExecEx(name, os.Stdout, os.Stderr, argv...)
-}
 
 func postInstallLuaRocks(instdir string) error {
 	printf("chdir %s", instdir)
@@ -34,7 +22,7 @@ func postInstallLuaRocks(instdir string) error {
 	printf("create lua_modules directory")
 	bin := fmt.Sprintf("%s/bin/luarocks", instdir)
 	var buf bytes.Buffer
-	if err := doExecEx(bin, &buf, os.Stderr, "path"); err != nil {
+	if err := DoExecEx(bin, &buf, os.Stderr, "path"); err != nil {
 		return err
 	}
 
@@ -228,7 +216,7 @@ func untarGz(dir string, data io.Reader) (string, error) {
 
 func installRocks(instdir string, cfg *TargetConfig) error {
 	luadir := filepath.Dir(cfg.RootDir)
-	if err := doExec("./configure", "--help"); err != nil {
+	if err := DoExec("./configure", "--help"); err != nil {
 		return err
 	}
 	opts := []string{
@@ -238,11 +226,11 @@ func installRocks(instdir string, cfg *TargetConfig) error {
 		// fmt.Sprintf("--with-lua-lib=%s/lib", luadir),
 	}
 	printf("./configure %s", strings.Join(opts, " "))
-	if err := doExec("./configure", opts...); err != nil {
+	if err := DoExec("./configure", opts...); err != nil {
 		return err
-	} else if err = doExec("make"); err != nil {
+	} else if err = DoExec("make"); err != nil {
 		return err
-	} else if err = doExec("make", "install"); err != nil {
+	} else if err = DoExec("make", "install"); err != nil {
 		return err
 	}
 
@@ -251,13 +239,25 @@ func installRocks(instdir string, cfg *TargetConfig) error {
 }
 
 func installLuaJit(instdir string, opts []string) error {
+	// clean up working directory
+	if err := DoExec("make", append([]string{"clean"}, opts...)...); err != nil {
+		return err
+	}
+
 	printf("make %s", strings.Join(opts, " "))
-	if err := doExec("make", opts...); err != nil {
+	if err := DoExec("make", opts...); err != nil {
 		return err
 	}
 
 	printf("make install PREFIX=" + instdir)
-	if err := doExec("make", "install", "PREFIX="+instdir); err != nil {
+	if err := DoExec("make", "install", "PREFIX="+instdir); err != nil {
+		return err
+	}
+
+	// clean up working directory
+	if err := DoExec("make", append([]string{"clean"}, opts...)...); err != nil {
+		return err
+	} else if err := DoExec("git", "checkout", "."); err != nil {
 		return err
 	}
 
@@ -267,12 +267,12 @@ func installLuaJit(instdir string, opts []string) error {
 
 func installLua(instdir string, opts []string) error {
 	printf("make %s", strings.Join(opts, " "))
-	if err := doExec("make", opts...); err != nil {
+	if err := DoExec("make", opts...); err != nil {
 		return err
 	}
 
 	printf("make install INSTALL_TOP=" + instdir)
-	return doExec("make", "install", "INSTALL_TOP="+instdir)
+	return DoExec("make", "install", "INSTALL_TOP="+instdir)
 }
 
 func openCachedFile(url string) (io.Reader, error) {
@@ -346,38 +346,62 @@ func extractDownloadedFile(tmpdir, url string) (string, error) {
 	}
 }
 
+func switchBranch(repodir, remote, branch string) error {
+	if err := os.Chdir(repodir); err != nil {
+		fatalf("failed to chdir(): %v", err)
+	}
+	defer os.Chdir(CWD)
+
+	if err := DoExec("git", "fetch", "--depth", "1", remote, branch); err != nil {
+		return err
+	} else if err = DoExec("git", "checkout", branch); err != nil {
+		return err
+	}
+	return DoExec("git", "checkout", ".")
+}
+
 func doInstall(cfg *TargetConfig, item *VerItem, opts []string) {
 	printf("install %q", item.Ver)
 
-	url := cfg.DownloadURL + filepath.Clean(item.Name)
-	tmpdir, err := os.MkdirTemp(os.TempDir(), "lenv_tmp_")
-	if err != nil {
-		fatalf("failed to create tempdir: %v", err)
-	}
-	defer os.RemoveAll(tmpdir)
-
-	dir, err := extractCachedFile(tmpdir, url)
-	if dir != "" {
-		printf("use cached file")
+	var dir string
+	if cfg.RepoDir != "" {
+		dir = cfg.RepoDir
+		if err := switchBranch(dir, item.Remote, item.Name); err != nil {
+			fatalf("failed to git checkout %s/%s: %v", item.Remote, item.Name, err)
+		}
 	} else {
+		url := cfg.DownloadURL + filepath.Clean(item.Name)
+		tmpdir, err := os.MkdirTemp(os.TempDir(), "lenv_tmp_")
 		if err != nil {
-			printf("failed to extract cached file: %v", err)
+			fatalf("failed to create tempdir: %v", err)
 		}
-		if dir, err = extractDownloadedFile(tmpdir, url); err != nil {
-			fatalf("failed to extract downloaded file: %v", err)
+		defer os.RemoveAll(tmpdir)
+
+		dir, err = extractCachedFile(tmpdir, url)
+		if dir != "" {
+			printf("use cached file")
+		} else {
+			if err != nil {
+				printf("failed to extract cached file: %v", err)
+			}
+			if dir, err = extractDownloadedFile(tmpdir, url); err != nil {
+				fatalf("failed to extract downloaded file: %v", err)
+			}
 		}
-	}
-	printf("chdir %q", dir)
-	if err = os.Chdir(dir); err != nil {
-		fatalf("failed to chdir(): %v", err)
 	}
 
 	instdir := filepath.Join(cfg.RootDir, item.Ver)
 	printf("remove old directory: %s", instdir)
-	if err = os.RemoveAll(instdir); err != nil {
+	if err := os.RemoveAll(instdir); err != nil {
 		fatalf("failed to os.RemoveAll(): %v", err)
 	}
 
+	printf("chdir %q", dir)
+	if err := os.Chdir(dir); err != nil {
+		fatalf("failed to chdir(): %v", err)
+	}
+
+	var err error
 	switch cfg.Name {
 	case "lua":
 		err = installLua(instdir, opts)
