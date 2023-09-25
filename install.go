@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -123,7 +122,7 @@ func postInstallLuaJit(instdir string) error {
 
 		switch dir {
 		case "bin":
-			infos, err := ioutil.ReadDir(".")
+			infos, err := os.ReadDir(".")
 			if err != nil {
 				return err
 			}
@@ -158,12 +157,12 @@ func postInstallLuaJit(instdir string) error {
 			}
 
 		case "lib":
-			infos, err := ioutil.ReadDir(".")
+			infos, err := os.ReadDir(".")
 			if err != nil {
 				return err
 			}
 			for _, info := range infos {
-				if info.Mode().IsRegular() {
+				if info.Type().IsRegular() {
 					oldname := info.Name()
 					if ext := filepath.Ext(oldname); ext != "" {
 						newname := "liblua" + ext
@@ -283,7 +282,7 @@ func openCachedFile(url string) (io.Reader, error) {
 		return nil, err
 	} else if f != nil {
 		defer f.Close()
-		b, err := ioutil.ReadAll(f)
+		b, err := io.ReadAll(f)
 		if err != nil {
 			return nil, err
 		}
@@ -324,7 +323,7 @@ func download(url string) (io.Reader, error) {
 	}
 	defer f.Close()
 
-	b, err := ioutil.ReadAll(rsp.Body)
+	b, err := io.ReadAll(rsp.Body)
 	if err != nil {
 		os.Remove(file)
 		return nil, err
@@ -351,7 +350,7 @@ func doInstall(cfg *TargetConfig, item *VerItem, opts []string) {
 	printf("install %q", item.Ver)
 
 	url := cfg.DownloadURL + filepath.Clean(item.Name)
-	tmpdir, err := ioutil.TempDir(os.TempDir(), "lenv_tmp_")
+	tmpdir, err := os.MkdirTemp(os.TempDir(), "lenv_tmp_")
 	if err != nil {
 		fatalf("failed to create tempdir: %v", err)
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -23,7 +22,7 @@ func CmdUninstall(cfg *TargetConfig, opts []string) {
 		fatalf("%s version %q does not defined in %q", cfg.Name, ver, cfg.VersionFile)
 	}
 
-	infos, err := ioutil.ReadDir(cfg.RootDir)
+	infos, err := os.ReadDir(cfg.RootDir)
 	if err != nil {
 		fatalf("failed to readdir: %v", err)
 	}
