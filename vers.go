@@ -106,13 +106,22 @@ func SortVersions(vers []string) {
 
 type VerItem struct {
 	Name   string
+	Remote string
 	Ver    string
 	Sum    string
 	Ext    string
 	SemVer *SemVer
 }
 
-func NewVerItem(name, ver, sum, ext string) *VerItem {
+func NewVerItem(name, remote, ver, sum, ext string) *VerItem {
+	if remote != "" {
+		return &VerItem{
+			Name:   name,
+			Remote: remote,
+			Ver:    name,
+		}
+	}
+
 	return &VerItem{
 		Name:   name,
 		Ver:    ver,
@@ -126,6 +135,10 @@ type VerItems []*VerItem
 
 func (items VerItems) Sort() {
 	sort.Slice(items, func(i, j int) bool {
+		if items[i].Remote != "" {
+			return items[i].Name > items[j].Name
+		}
+
 		if items[i].SemVer == nil {
 			items[i].SemVer = NewSemVer(items[i].Ver)
 		}
@@ -185,10 +198,14 @@ func (vers *Versions) ReadFile(filename string) error {
 
 func (vers *Versions) Add(name, ver, sum, ext string) bool {
 	if IsSemVer(ver) {
-		vers.dict[ver] = NewVerItem(name, ver, sum, ext)
+		vers.dict[ver] = NewVerItem(name, "", ver, sum, ext)
 		return true
 	}
 	return false
+}
+
+func (vers *Versions) AddBranch(name, remote string) {
+	vers.dict[name] = NewVerItem(name, remote, "", "", "")
 }
 
 func (vers *Versions) GetItem(ver string) *VerItem {
@@ -276,7 +293,7 @@ func PickTargetVersionItem(cfg *TargetConfig, ver string) *VerItem {
 	if item == nil {
 		printf("not found")
 		fatalf("%s version %q does not defined in %q\n%s", cfg.Name, ver, cfg.VersionFile, ListTargetVersions(cfg))
-	} else if item.Ext != ".tar.gz" {
+	} else if item.SemVer != nil && item.Ext != ".tar.gz" {
 		fatalf("unsupported media-type %q", item.Name)
 	}
 	printf("found %q", item.Ver)

@@ -20,19 +20,6 @@ func Test_parseLuaRocksVers(t *testing.T) {
 	assert.Equal(t, exp, names)
 }
 
-func Test_parseLuaJitVers(t *testing.T) {
-	exp := []string{"LuaJIT-2.1.0-beta3.tar.gz", "LuaJIT-2.0.5.tar.gz", "LuaJIT-1.1.8.tar.gz", "LuaJIT-1.0.3.tar.gz"}
-	names := []string{}
-
-	list, _ := parseLuaJitVers([]byte(LuaJitHTML)).GetList()
-	for _, item := range list {
-		names = append(names, item.Name)
-	}
-	sort.Strings(exp)
-	sort.Strings(names)
-	assert.Equal(t, exp, names)
-}
-
 func Test_parseLuaVers(t *testing.T) {
 	exp := []string{"lua-5.4.4.tar.gz", "lua-5.4.3.tar.gz", "lua-5.4.2.tar.gz", "lua-5.4.1.tar.gz", "lua-5.4.0.tar.gz", "lua-5.3.6.tar.gz", "lua-5.3.5.tar.gz", "lua-5.3.4.tar.gz", "lua-5.3.3.tar.gz", "lua-5.3.2.tar.gz", "lua-5.3.1.tar.gz", "lua-5.3.0.tar.gz", "lua-5.2.4.tar.gz", "lua-5.2.3.tar.gz", "lua-5.2.2.tar.gz", "lua-5.2.1.tar.gz", "lua-5.2.0.tar.gz", "lua-5.1.5.tar.gz", "lua-5.1.4.tar.gz", "lua-5.1.3.tar.gz", "lua-5.1.2.tar.gz", "lua-5.1.1.tar.gz", "lua-5.1.tar.gz", "lua-5.0.3.tar.gz", "lua-5.0.2.tar.gz", "lua-5.0.1.tar.gz", "lua-5.0.tar.gz", "lua-4.0.1.tar.gz", "lua-4.0.tar.gz", "lua-3.2.2.tar.gz", "lua-3.2.1.tar.gz", "lua-3.2.tar.gz", "lua-3.1.tar.gz", "lua-3.0.tar.gz", "lua-2.5.tar.gz", "lua-2.4.tar.gz", "lua-2.2.tar.gz", "lua-2.1.tar.gz", "lua-1.1.tar.gz", "lua-1.0.tar.gz"}
 	names := []string{}

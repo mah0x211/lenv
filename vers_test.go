@@ -84,7 +84,7 @@ func Test_VerItems_Sort(t *testing.T) {
 
 		vitems := VerItems{}
 		for _, ver := range arr {
-			vitems = append(vitems, NewVerItem("foo", ver, "", ""))
+			vitems = append(vitems, NewVerItem("foo", "", ver, "", ""))
 		}
 		arr = nil
 		vitems.Sort()

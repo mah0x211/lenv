@@ -7,11 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 )
 
 type TargetConfig struct {
 	Name        string
+	RepoDir     string
 	RootDir     string
 	VersionFile string
 	ReleaseURL  string
@@ -19,6 +21,7 @@ type TargetConfig struct {
 }
 
 var (
+	CWD         = os.Getenv("PWD")
 	LenvDir     = filepath.Join(os.Getenv("HOME"), ".lenv")
 	SrcDir      = filepath.Join(LenvDir, "src")
 	CurrentDir  = filepath.Join(LenvDir, "current")
@@ -33,10 +36,10 @@ var (
 	}
 	LuaJitCfg = &TargetConfig{
 		Name:        "luajit",
+		RepoDir:     filepath.Join(SrcDir, "luajit"),
 		RootDir:     filepath.Join(LenvDir, "luajit"),
 		VersionFile: filepath.Join(LenvDir, "luajit_vers.txt"),
-		ReleaseURL:  "https://luajit.org/download.html",
-		DownloadURL: "https://luajit.org/download/",
+		ReleaseURL:  "https://github.com/LuaJIT/LuaJIT.git",
 	}
 	LuaRocksCfg = &TargetConfig{
 		Name:        "luarocks",
@@ -267,7 +270,17 @@ func start() {
 	case "install-lj":
 		argv = argv[1:]
 		if runtime.GOOS == "darwin" {
-			argv = append(argv, "MACOSX_DEPLOYMENT_TARGET=10.6")
+			// set MACOSX_DEPLOYMENT_TARGET=10.8 by default
+			found := false
+			for _, arg := range argv {
+				found = strings.HasPrefix(arg, "MACOSX_DEPLOYMENT_TARGET")
+				if found {
+					break
+				}
+			}
+			if !found {
+				argv = append(argv, "MACOSX_DEPLOYMENT_TARGET=10.8")
+			}
 		}
 		CmdInstall(LuaJitCfg, argv)
 
@@ -351,6 +364,13 @@ func ResolveCurrentDir() {
 }
 
 func init() {
+	// get current working directory
+	wd, err := os.Getwd()
+	if err != nil {
+		fatalf("failed to getwd(): %v", err)
+	}
+	CWD = wd
+
 	ResolveCurrentDir()
 }
 
