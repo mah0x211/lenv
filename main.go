@@ -49,6 +49,33 @@ var (
 	}
 )
 
+func init_global_vars(inst_globally bool) {
+	// get current working directory
+	wd, err := os.Getwd()
+	if err != nil {
+		fatalf("failed to getwd(): %v", err)
+	}
+	CWD = wd
+
+	if inst_globally {
+		// set LenvDir to /usr/local/lenv
+		LenvDir = filepath.Join("/usr/local/lenv")
+	}
+
+	SrcDir = filepath.Join(LenvDir, "src")
+	CurrentDir = filepath.Join(LenvDir, "current")
+	CurrentUsed = ""
+
+	LuaCfg.RootDir = filepath.Join(LenvDir, "lua")
+	LuaCfg.VersionFile = filepath.Join(LenvDir, "lua_vers.txt")
+	LuaJitCfg.RepoDir = filepath.Join(SrcDir, "luajit")
+	LuaJitCfg.RootDir = filepath.Join(LenvDir, "luajit")
+	LuaJitCfg.VersionFile = filepath.Join(LenvDir, "luajit_vers.txt")
+	LuaRocksCfg.VersionFile = filepath.Join(LenvDir, "luarocks_vers.txt")
+
+	ResolveCurrentDir()
+}
+
 func eprintf(format string, v ...interface{}) {
 	os.Stderr.WriteString(fmt.Sprintf(format, v...))
 	os.Stderr.Write([]byte{'\n'})
@@ -238,18 +265,21 @@ func CheckLuaRocksRootDir() {
 
 func start() {
 	argv := os.Args[1:]
-	if len(argv) == 0 {
-		CmdHelp(0)
+	if len(argv) > 0 {
+		inst_globally := argv[0] == "-g" || argv[0] == "--global"
+		if inst_globally {
+			argv = argv[1:]
+		}
+		init_global_vars(inst_globally)
 	}
 
-	if argv[0] != "setup" {
+	if len(argv) == 0 || argv[0] == "help" {
+		CmdHelp(0)
+	} else if argv[0] != "setup" {
 		checkInitialized()
 	}
 
 	switch argv[0] {
-	case "help":
-		CmdHelp(0)
-
 	case "setup":
 		CmdSetup()
 
@@ -362,17 +392,6 @@ func ResolveCurrentDir() {
 			}
 		}
 	}
-}
-
-func init() {
-	// get current working directory
-	wd, err := os.Getwd()
-	if err != nil {
-		fatalf("failed to getwd(): %v", err)
-	}
-	CWD = wd
-
-	ResolveCurrentDir()
 }
 
 func main() {
