@@ -11,15 +11,18 @@ Lua Version Manager.
 
 1. download a binary release from the [releases](https://github.com/mah0x211/lenv/releases) page.
 2. extract the downloaded file and place the `lenv` command in the desired location. (e.g. `/usr/local/bin/lenv`)
-
+3. run a `lenv setup` command to set up the required files and directories.
+    - you can also run a `lenv -g setup` command to set up the required files and directories in the `/usr/local/lenv` directory.
 
 **Setting up the `.lenvrc` file.**
 
 1. run `lenv path > ~/.lenvrc` command to create the `lenvrc` file.
+    - if you set up the required files and directories in the `/usr/local/lenv` directory, you should run a `lenv -g path > ~/.lenvrc` command.
 2. add the following to your `.bashrc` or `.bash_profile` file.
     ```sh
     source ~/.lenvrc
     ```
+
 
 ## Commands
 
