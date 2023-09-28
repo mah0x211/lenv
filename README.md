@@ -31,19 +31,25 @@ $ lenv help
 lenv - lua version manager
 
 Usage:
-  lenv help                           Show this message
-  lenv setup                          Set up required files and directories
-  lenv path                           Show the configured paths
-  lenv fetch                          Fetch remote versions
-  lenv vers                           List available versions
-  lenv ls                             List installed versions
-  lenv install <version> <opt...>     Install and use a <version> of lua
-  lenv install-lj <version> <opt...>  Install and use a <version> of luajit
-  lenv install-rocks <version>        Install and use a <version> of lurocks in
-                                      current lua environment
-  lenv use <version>                  Use a <version> of lua
-  lenv use-lj <version>               Use a <version> of luajit
-  lenv use-rocks <version>            Use a <version> of luajit
+  lenv <option> <command> [<args>...]
+
+Options:
+  -g, --global                   Use /usr/local/lenv as installation directory
+
+Commands:
+  help                           Show this message
+  setup                          Set up required files and directories
+  path                           Show the configured paths
+  fetch                          Fetch remote versions
+  vers                           List available versions
+  ls                             List installed versions
+  install <version> <opt...>     Install and use a <version> of lua
+  install-lj <version> <opt...>  Install and use a <version> of luajit
+  install-rocks <version>        Install and use a <version> of lurocks in
+                                  current lua environment
+  use <version>                  Use a <version> of lua
+  use-lj <version>               Use a <version> of luajit
+  use-rocks <version>            Use a <version> of luajit
 
   Note:
     The <version> specifier of the above commands can be specified as follows;
@@ -59,9 +65,9 @@ Usage:
                                ; luarocks
     lenv install :latest       ; that picks the the latest version of luarocks
 
-  lenv uninstall <version>            Uninstall a <version> of lua
-  lenv uninstall-lj <version>         Uninstall a <version> of luajit
-  lenv uninstall-rocks <version>      Uninstall a <version> of luarocks
+  uninstall <version>            Uninstall a <version> of lua
+  uninstall-lj <version>         Uninstall a <version> of luajit
+  uninstall-rocks <version>      Uninstall a <version> of luarocks
 
 ```
 
