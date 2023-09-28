@@ -15,7 +15,6 @@ type ParseFunc func(v interface{}) *Versions
 
 var (
 	ReLuaRocksVer = regexp.MustCompile(`(?si)href="(luarocks-([^"]+?)\.tar\.gz).*?href="(luarocks-[^"]+?\.tar\.gz\.asc)"`)
-	ReLuaJitVer   = regexp.MustCompile(`(?i)([0-9a-f]+?)\s+(LuaJIT-([^\s]+?)\.tar\.gz)`)
 	ReLuaVer      = regexp.MustCompile(`(?si)<tr>\s*<td class="name"><a href="(lua-([^"]+?)\.tar\.gz).+?class="sum">([0-9a-f]+)</td>\s*</tr>`)
 )
 
