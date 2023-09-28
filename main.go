@@ -205,7 +205,7 @@ func writeFile(file string, perm os.FileMode, src io.Reader) error {
 }
 
 func hasRequiredDirs() bool {
-	// create required directories
+	// check required directories
 	for _, dir := range []string{
 		LenvDir, SrcDir, LuaCfg.RootDir, LuaJitCfg.RootDir,
 	} {
@@ -239,9 +239,10 @@ func CheckLuaRocksRootDir() {
 func start() {
 	argv := os.Args[1:]
 	if len(argv) == 0 {
-		checkInitialized()
 		CmdHelp(0)
-	} else if argv[0] != "setup" {
+	}
+
+	if argv[0] != "setup" {
 		checkInitialized()
 	}
 
