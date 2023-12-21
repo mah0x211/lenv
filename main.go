@@ -31,8 +31,8 @@ var (
 		Name:        "lua",
 		RootDir:     filepath.Join(LenvDir, "lua"),
 		VersionFile: filepath.Join(LenvDir, "lua_vers.txt"),
-		ReleaseURL:  "http://www.lua.org/ftp/",
-		DownloadURL: "http://www.lua.org/ftp/",
+		ReleaseURL:  "http://lua.org/ftp/",
+		DownloadURL: "http://lua.org/ftp/",
 	}
 	LuaJitCfg = &TargetConfig{
 		Name:        "luajit",
