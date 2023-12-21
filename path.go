@@ -6,7 +6,34 @@ import (
 	"strings"
 )
 
-func CmdPath() {
+func get_luacpath() string {
+	prefix := filepath.Clean(CurrentDir+"/lua_modules/luaclib") + "/"
+	paths := []string{}
+	for i := 0; i <= 10; i++ {
+		dir := prefix + strconv.Itoa(i)
+		paths = append(paths, dir+"/?.so")
+	}
+	return strings.Join(paths, ";") + ";;"
+}
+
+func get_luapath() string {
+	prefix := filepath.Clean(CurrentDir+"/lua_modules/lualib") + "/"
+	paths := []string{}
+	for i := 0; i <= 10; i++ {
+		dir := prefix + strconv.Itoa(i)
+		paths = append(paths, dir+"/?.lua", dir+"/?/init.lua")
+	}
+	return strings.Join(paths, ";") + ";;"
+}
+
+func get_path() string {
+	return strings.Join([]string{
+		filepath.Clean(CurrentDir + "/bin"),
+		filepath.Clean(CurrentDir + "/lua_modules/bin"),
+	}, ":")
+}
+
+func printAll() {
 	printf(`
 #
 # please add the following lenv settings to your environment
@@ -14,41 +41,37 @@ func CmdPath() {
 `)
 
 	for _, name := range []string{"PATH", "LUA_PATH", "LUA_CPATH"} {
-		var (
-			format string
-			value  string
-		)
-
+		var value string
 		switch name {
 		case "PATH":
-			format = `export %s="%s"`
-			value = strings.Join([]string{
-				filepath.Clean(CurrentDir + "/bin"),
-				filepath.Clean(CurrentDir + "/lua_modules/bin"),
-				"$PATH",
-			}, ":")
+			value = get_path() + ":$PATH"
 
 		case "LUA_PATH":
-			format = `export %s="%s;"`
-			prefix := filepath.Clean(CurrentDir+"/lua_modules/lualib") + "/"
-			paths := []string{}
-			for i := 0; i <= 10; i++ {
-				dir := prefix + strconv.Itoa(i)
-				paths = append(paths, dir+"/?.lua", dir+"/?/init.lua")
-			}
-			value = strings.Join(paths, ";") + ";"
+			value = get_luapath()
 
 		case "LUA_CPATH":
-			format = `export %s="%s;"`
-			prefix := filepath.Clean(CurrentDir+"/lua_modules/luaclib") + "/"
-			paths := []string{}
-			for i := 0; i <= 10; i++ {
-				dir := prefix + strconv.Itoa(i)
-				paths = append(paths, dir+"/?.so")
-			}
-			value = strings.Join(paths, ";") + ";"
+			value = get_luacpath()
 		}
-		printf(format, name, value)
+		printf(`export %s="%s"`, name, value)
 	}
 	printf("")
+}
+
+func CmdPath(opts []string) {
+	if len(opts) > 0 {
+		switch opts[0] {
+		case "bin":
+			printf(get_path())
+			return
+
+		case "lualib":
+			printf(get_luapath())
+			return
+
+		case "luaclib":
+			printf(get_luacpath())
+			return
+		}
+	}
+	printAll()
 }
