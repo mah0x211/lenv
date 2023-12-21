@@ -28,7 +28,18 @@ Options:
 Commands:
   help                           Show this message
   setup                          Set up required files and directories
-  path                           Show the configured paths
+  path <target>                  Show the configured paths
+
+  Note:
+    The <target> specifier of the above commands can be specified as follows;
+
+    lenv path bin     ; show the PATH of the current lua environment
+    lenv path lualib  ; show the LUA_PATH of the current lua environment
+    lenv path luaclib ; show the LUA_CPATH of the current lua environment
+
+    if <target> is not specified, all the above paths of the current lua
+    environment will be shown.
+
   fetch                          Fetch remote versions
   vers                           List available versions
   ls                             List installed versions

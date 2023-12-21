@@ -284,7 +284,7 @@ func start() {
 		CmdSetup()
 
 	case "path":
-		CmdPath()
+		CmdPath(argv[1:])
 
 	case "fetch":
 		CmdFetch()

@@ -28,7 +28,7 @@ Lua Version Manager.
 
 please run a `help` command to show the help message.
 
-```sh
+```
 $ lenv help
 
 lenv - lua version manager
@@ -42,7 +42,18 @@ Options:
 Commands:
   help                           Show this message
   setup                          Set up required files and directories
-  path                           Show the configured paths
+  path [<target>]                Show the configured paths
+
+  Note:
+    The <target> specifier of the above commands can be specified as follows;
+
+    lenv path bin     ; show the PATH of the current lua environment
+    lenv path lualib  ; show the LUA_PATH of the current lua environment
+    lenv path luaclib ; show the LUA_CPATH of the current lua environment
+
+    if <target> is not specified, all the above paths of the current lua 
+    environment will be shown.
+
   fetch                          Fetch remote versions
   vers                           List available versions
   ls                             List installed versions
@@ -71,7 +82,6 @@ Commands:
   uninstall <version>            Uninstall a <version> of lua
   uninstall-lj <version>         Uninstall a <version> of luajit
   uninstall-rocks <version>      Uninstall a <version> of luarocks
-
 ```
 
 **NOTE: you must run a `fetch` command at the first. that command will crawling the version files of `Lua`, `LuaJIT` and `LuaRocks` immediately.**
