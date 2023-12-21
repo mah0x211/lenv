@@ -153,6 +153,12 @@ func CmdFetch() {
 			}
 			defer rsp.Body.Close()
 
+			// check status code
+			if rsp.StatusCode != http.StatusOK {
+				eprintf("failed to download %q: %s\n", target.cfg.ReleaseURL, rsp.Status)
+				continue
+			}
+
 			b, err := io.ReadAll(rsp.Body)
 			if err != nil {
 				eprintf("failed to read body: %v\n", err)

@@ -83,6 +83,14 @@ $ lenv vers
 ...snip...
 ```
 
+**Package URL's**
+
+the following URL's are used to download the version files and source files.
+
+- Lua: https://lua.org/ftp/
+- LuaJIT: https://github.com/LuaJIT/LuaJIT.git
+- LuaRocks: https://luarocks.github.io/luarocks/releases/
+
 
 ## Usage
 
