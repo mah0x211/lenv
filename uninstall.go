@@ -23,7 +23,7 @@ func uninstall(t *Target) {
 }
 
 func CmdUninstall(opts []string) {
-	target := PickTargetVersion(opts[0])
+	target := PickTargetVersion(opts[0], true)
 
 	// uninstall the specified version of lua
 	if target.Lua != nil {

@@ -438,7 +438,7 @@ func doInstall(cfg *TargetConfig, item *VerItem, opts []string) {
 }
 
 func CmdInstall(opts []string) {
-	target := PickTargetVersion(opts[0])
+	target := PickTargetVersion(opts[0], false)
 	if target.Lua != nil {
 		doInstall(target.Lua.Config, target.Lua.Version, opts[1:])
 	}

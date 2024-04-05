@@ -63,6 +63,10 @@ Commands:
     If the version of luarocks is specified along with the version of lua, the
     operation will target the specified version of the lua environment.
     Otherwise, the operation will target the current lua environment.
+
+    In the case of the 'uninstall' command, the version specifier must match the
+    target version exactly. Also, if the version of luarocks is specified along
+    with the version of lua, the version specifier of luarocks is ignored.
 `)
 	osExit(rc)
 }

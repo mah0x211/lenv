@@ -273,7 +273,7 @@ type TargetVersion struct {
 	LuaRocks *Target
 }
 
-func PickTargetVersion(vers string) *TargetVersion {
+func PickTargetVersion(vers string, exactMatch bool) *TargetVersion {
 	// check target version
 	if len(vers) == 0 || vers == ":" {
 		CmdHelp(1, "no version specified")
@@ -292,13 +292,13 @@ func PickTargetVersion(vers string) *TargetVersion {
 			// if `lj-' prefix is specified, then the target is LuaJIT version
 			target.Lua = &Target{
 				Config:  LuaJitCfg,
-				Version: PickTargetVersionItem(LuaJitCfg, vers[3:]),
+				Version: PickTargetVersionItem(LuaJitCfg, vers[3:], exactMatch),
 			}
 		} else {
 			// otherwise the target is Lua version.
 			target.Lua = &Target{
 				Config:  LuaCfg,
-				Version: PickTargetVersionItem(LuaCfg, vers),
+				Version: PickTargetVersionItem(LuaCfg, vers, exactMatch),
 			}
 		}
 	}
@@ -306,7 +306,7 @@ func PickTargetVersion(vers string) *TargetVersion {
 	if len(rocksVer) > 0 {
 		target.LuaRocks = &Target{
 			Config:  LuaRocksCfg,
-			Version: PickTargetVersionItem(LuaRocksCfg, rocksVer),
+			Version: PickTargetVersionItem(LuaRocksCfg, rocksVer, exactMatch),
 		}
 	}
 
