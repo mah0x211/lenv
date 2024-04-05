@@ -51,37 +51,37 @@ Commands:
     lenv path lualib  ; show the LUA_PATH of the current lua environment
     lenv path luaclib ; show the LUA_CPATH of the current lua environment
 
-    if <target> is not specified, all the above paths of the current lua 
+    if <target> is not specified, all the above paths of the current lua
     environment will be shown.
 
   fetch                          Fetch remote versions
   vers                           List available versions
   ls                             List installed versions
   install <version> <opt...>     Install and use a <version> of lua
-  install-lj <version> <opt...>  Install and use a <version> of luajit
-  install-rocks <version>        Install and use a <version> of lurocks in
-                                  current lua environment
   use <version>                  Use a <version> of lua
-  use-lj <version>               Use a <version> of luajit
-  use-rocks <version>            Use a <version> of luajit
+  uninstall <version>            Uninstall a <version> of lua
 
   Note:
     The <version> specifier of the above commands can be specified as follows;
 
-    lenv install latest ; that picks the latest version
-    lenv install 5      ; that picks the latest minor version and patch version
-    lenv install 5.4    ; that picks the latest patch version
-
-    In addition, the install and install-lj commands can be used to install
-    luarocks at the same time with the following <version> specifier;
+    lenv install latest  ; that picks the latest version
+    lenv install 5       ; that picks the latest minor version and patch version
+    lenv install 5.4     ; that picks the latest patch version
+    lenv install lj-v2.1 ; that picks the version of luajit
 
     lenv install latest:latest ; that picks the the latest version of lua and
-                               ; luarocks
+                               ; luarocks in current lua environment
     lenv install :latest       ; that picks the the latest version of luarocks
+                                 in current lua environment
 
-  uninstall <version>            Uninstall a <version> of lua
-  uninstall-lj <version>         Uninstall a <version> of luajit
-  uninstall-rocks <version>      Uninstall a <version> of luarocks
+    If the version of luarocks is specified along with the version of lua, the
+    operation will target the specified version of the lua environment.
+    Otherwise, the operation will target the current lua environment.
+
+    In the case of the 'uninstall' command, the version specifier must match the
+    target version exactly. Also, if the version of luarocks is specified along
+    with the version of lua, the version specifier of luarocks is ignored.
+
 ```
 
 **NOTE: you must run a `fetch` command at the first. that command will crawling the version files of `Lua`, `LuaJIT` and `LuaRocks` immediately.**
@@ -113,13 +113,13 @@ $ lua -v
 Lua 5.1.5  Copyright (C) 1994-2012 Lua.org, PUC-Rio
 ```
 
-the following example are installing the LuaJIT 2.0.4.
+the following example are installing the LuaJIT v2.1.
 
 ```sh
-$ lenv install-lj 2.0.4
+$ lenv install lj-v2.1
 ...snip...
 $ lua -v
-LuaJIT 2.0.4 -- Copyright (C) 2005-2015 Mike Pall. http://luajit.org/
+LuaJIT 2.1.1710088188 -- Copyright (C) 2005-2023 Mike Pall. https://luajit.org/
 ```
 
 the following example are installing the LuaRocks 3.5.0 for Lua 5.1.5.
