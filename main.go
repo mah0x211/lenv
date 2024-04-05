@@ -259,7 +259,7 @@ ERROR: the required directory does not exists.
 
 func CheckLuaRocksRootDir() {
 	if LuaRocksCfg.RootDir == "" {
-		fatalf("%q does not exist.\nplease run `lenv use <ver>` or `lenv use-lj <ver>` before installing or uninstalling luarocks", CurrentDir)
+		fatalf("%q does not exist.\nplease run `lenv use <ver>` before installing or uninstalling luarocks", CurrentDir)
 	}
 }
 
@@ -359,14 +359,7 @@ func start() {
 		CmdUninstall(LuaRocksCfg, argv[1:])
 
 	case "use":
-		CmdUse(LuaCfg, argv[1:])
-
-	case "use-lj":
-		CmdUse(LuaJitCfg, argv[1:])
-
-	case "use-rocks":
-		CheckLuaRocksRootDir()
-		CmdUse(LuaRocksCfg, argv[1:])
+		CmdUse(argv[1:])
 
 	default:
 		CmdHelp(1, "unknown command %q", argv[0])

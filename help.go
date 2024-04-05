@@ -45,8 +45,6 @@ Commands:
   ls                             List installed versions
   install <version> <opt...>     Install and use a <version> of lua
   use <version>                  Use a <version> of lua
-  use-lj <version>               Use a <version> of luajit
-  use-rocks <version>            Use a <version> of luajit
 
   Note:
     The <version> specifier of the above commands can be specified as follows;
