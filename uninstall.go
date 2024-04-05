@@ -5,40 +5,36 @@ import (
 	"path/filepath"
 )
 
-func CmdUninstall(cfg *TargetConfig, opts []string) {
-	// check target version
-	if len(opts) == 0 {
-		CmdHelp(1, "no version specified")
-	}
-
-	vers, err := NewVersionsFromFile(cfg.VersionFile)
+func uninstall(t *Target) {
+	dir := filepath.Join(t.Config.RootDir, t.Version.Ver)
+	stat, err := os.Stat(dir)
 	if err != nil {
-		fatalf("failed to read version file %q: %v", cfg.VersionFile, err)
-	}
-
-	ver := opts[0]
-	item := vers.GetItem(ver)
-	if item == nil {
-		fatalf("%s version %q does not defined in %q", cfg.Name, ver, cfg.VersionFile)
-	}
-
-	infos, err := os.ReadDir(cfg.RootDir)
-	if err != nil {
-		fatalf("failed to readdir: %v", err)
-	}
-
-	for _, info := range infos {
-		if info.Name() == ver {
-			dir := filepath.Join(cfg.RootDir, ver)
-			if !info.IsDir() {
-				fatalf("found %s %s (%q) but it is not a directory.\nplease remove it yourself.", cfg.Name, ver, dir)
-			} else if err = os.RemoveAll(dir); err != nil {
-				fatalf("failed to uninstall version %s: %v", ver, err)
-			}
-			printf("%s version %s (%q) has been uninstalled.", cfg.Name, ver, dir)
-			return
+		if !os.IsNotExist(err) {
+			fatalf("failed to stat %q: %v", dir, err)
 		}
+		fatalf("%s version %s is not installed.", t.Config.Name, t.Version.Ver)
+	}
+	if !stat.IsDir() {
+		fatalf("found %s %s (%q) but it is not a directory.\nplease remove it yourself.", t.Config.Name, t.Version.Ver, dir)
+	} else if err = os.RemoveAll(dir); err != nil {
+		fatalf("failed to uninstall version %s: %v", t.Version.Ver, err)
+	}
+	printf("%s version %s (%q) has been uninstalled.", t.Config.Name, t.Version.Ver, dir)
+}
+
+func CmdUninstall(opts []string) {
+	target := PickTargetVersion(opts[0], true)
+
+	// uninstall the specified version of lua
+	if target.Lua != nil {
+		uninstall(target.Lua)
+		// it is remove all the versions of luarocks
+		return
 	}
 
-	fatalf("%s version %q is not installed", cfg.Name, ver)
+	// uninstall the specified version of luarocks
+	if target.LuaRocks != nil {
+		CheckLuaRocksRootDir()
+		uninstall(target.LuaRocks)
+	}
 }

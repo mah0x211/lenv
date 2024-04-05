@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -239,6 +240,20 @@ func installRocks(instdir string, cfg *TargetConfig) error {
 }
 
 func installLuaJit(instdir string, opts []string) error {
+	if runtime.GOOS == "darwin" {
+		// append MACOSX_DEPLOYMENT_TARGET=10.8 by default on macOS platform
+		found := false
+		for _, opt := range opts {
+			found = strings.HasPrefix(opt, "MACOSX_DEPLOYMENT_TARGET")
+			if found {
+				break
+			}
+		}
+		if !found {
+			opts = append(opts, "MACOSX_DEPLOYMENT_TARGET=10.8")
+		}
+	}
+
 	// clean up working directory
 	if err := DoExec("make", append([]string{"clean"}, opts...)...); err != nil {
 		return err
@@ -422,37 +437,14 @@ func doInstall(cfg *TargetConfig, item *VerItem, opts []string) {
 	UseInstalledVersion(cfg, item.Ver)
 }
 
-func CmdInstall(cfg *TargetConfig, opts []string) {
-	// check target version
-	if len(opts) == 0 || (cfg != LuaRocksCfg && opts[0] == ":") {
-		CmdHelp(1, "no version specified")
+func CmdInstall(opts []string) {
+	target := PickTargetVersion(opts[0], false)
+	if target.Lua != nil {
+		doInstall(target.Lua.Config, target.Lua.Version, opts[1:])
 	}
-	ver := opts[0]
-
-	// check :<luarocks-version>
-	var rocksVer string
-	if cfg != LuaRocksCfg {
-		if delim := strings.Index(ver, ":"); delim != -1 {
-			rocksVer = ver[delim+1:]
-			ver = ver[:delim]
-		}
-	}
-
-	var verItem *VerItem
-	if len(ver) > 0 {
-		verItem = PickTargetVersionItem(cfg, ver)
-	}
-	var rocksItem *VerItem
-	if len(rocksVer) > 0 {
-		rocksItem = PickTargetVersionItem(LuaRocksCfg, rocksVer)
-	}
-
-	if verItem != nil {
-		doInstall(cfg, verItem, opts[1:])
-	}
-	if rocksItem != nil {
+	if target.LuaRocks != nil {
 		ResolveCurrentDir()
 		CheckLuaRocksRootDir()
-		doInstall(LuaRocksCfg, rocksItem, opts)
+		doInstall(target.LuaRocks.Config, target.LuaRocks.Version, opts[1:])
 	}
 }

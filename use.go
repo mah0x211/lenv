@@ -48,35 +48,13 @@ func UseInstalledVersion(cfg *TargetConfig, ver string) {
 	fatalf("%s version %q is not installed", cfg.Name, ver)
 }
 
-func CmdUse(cfg *TargetConfig, opts []string) {
-	// check target version
-	if len(opts) == 0 || (cfg != LuaRocksCfg && opts[0] == ":") {
-		CmdHelp(1, "no version specified")
+func CmdUse(opts []string) {
+	target := PickTargetVersion(opts[0], false)
+	if target.Lua != nil {
+		UseInstalledVersion(target.Lua.Config, target.Lua.Version.Ver)
 	}
-	ver := opts[0]
-
-	// check :<luarocks-version>
-	var rocksVer string
-	if cfg != LuaRocksCfg {
-		if delim := strings.Index(ver, ":"); delim != -1 {
-			rocksVer = ver[delim+1:]
-			ver = ver[:delim]
-		}
-	}
-
-	var verItem *VerItem
-	if len(ver) > 0 {
-		verItem = PickTargetVersionItem(cfg, ver)
-	}
-	var rocksItem *VerItem
-	if len(rocksVer) > 0 {
-		rocksItem = PickTargetVersionItem(LuaRocksCfg, rocksVer)
-	}
-
-	if verItem != nil {
-		UseInstalledVersion(cfg, verItem.Ver)
-	}
-	if rocksItem != nil {
-		UseInstalledVersion(LuaRocksCfg, rocksItem.Ver)
+	if target.LuaRocks != nil {
+		CheckLuaRocksRootDir()
+		UseInstalledVersion(target.LuaRocks.Config, target.LuaRocks.Version.Ver)
 	}
 }
