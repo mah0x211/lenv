@@ -263,6 +263,56 @@ func CheckLuaRocksRootDir() {
 	}
 }
 
+type Target struct {
+	Config  *TargetConfig
+	Version *VerItem
+}
+
+type TargetVersion struct {
+	Lua      *Target
+	LuaRocks *Target
+}
+
+func PickTargetVersion(vers string) *TargetVersion {
+	// check target version
+	if len(vers) == 0 || vers == ":" {
+		CmdHelp(1, "no version specified")
+	}
+
+	// check :<luarocks-version>
+	var rocksVer string
+	if delim := strings.Index(vers, ":"); delim != -1 {
+		rocksVer = vers[delim+1:]
+		vers = vers[:delim]
+	}
+
+	target := &TargetVersion{}
+	if len(vers) > 0 {
+		if strings.HasPrefix(vers, "lj-") {
+			// if `lj-' prefix is specified, then the target is LuaJIT version
+			target.Lua = &Target{
+				Config:  LuaJitCfg,
+				Version: PickTargetVersionItem(LuaJitCfg, vers[3:]),
+			}
+		} else {
+			// otherwise the target is Lua version.
+			target.Lua = &Target{
+				Config:  LuaCfg,
+				Version: PickTargetVersionItem(LuaCfg, vers),
+			}
+		}
+	}
+
+	if len(rocksVer) > 0 {
+		target.LuaRocks = &Target{
+			Config:  LuaRocksCfg,
+			Version: PickTargetVersionItem(LuaRocksCfg, rocksVer),
+		}
+	}
+
+	return target
+}
+
 func start() {
 	argv := os.Args[1:]
 	if len(argv) > 0 {
@@ -296,28 +346,7 @@ func start() {
 		CmdList()
 
 	case "install":
-		CmdInstall(LuaCfg, argv[1:])
-
-	case "install-lj":
-		argv = argv[1:]
-		if runtime.GOOS == "darwin" {
-			// set MACOSX_DEPLOYMENT_TARGET=10.8 by default
-			found := false
-			for _, arg := range argv {
-				found = strings.HasPrefix(arg, "MACOSX_DEPLOYMENT_TARGET")
-				if found {
-					break
-				}
-			}
-			if !found {
-				argv = append(argv, "MACOSX_DEPLOYMENT_TARGET=10.8")
-			}
-		}
-		CmdInstall(LuaJitCfg, argv)
-
-	case "install-rocks":
-		CheckLuaRocksRootDir()
-		CmdInstall(LuaRocksCfg, argv[1:])
+		CmdInstall(argv[1:])
 
 	case "uninstall":
 		CmdUninstall(LuaCfg, argv[1:])

@@ -44,9 +44,6 @@ Commands:
   vers                           List available versions
   ls                             List installed versions
   install <version> <opt...>     Install and use a <version> of lua
-  install-lj <version> <opt...>  Install and use a <version> of luajit
-  install-rocks <version>        Install and use a <version> of lurocks in
-                                  current lua environment
   use <version>                  Use a <version> of lua
   use-lj <version>               Use a <version> of luajit
   use-rocks <version>            Use a <version> of luajit
@@ -54,16 +51,18 @@ Commands:
   Note:
     The <version> specifier of the above commands can be specified as follows;
 
-    lenv install latest ; that picks the latest version
-    lenv install 5      ; that picks the latest minor version and patch version
-    lenv install 5.4    ; that picks the latest patch version
-
-    In addition, the install and install-lj commands can be used to install
-    luarocks at the same time with the following <version> specifier;
+    lenv install latest  ; that picks the latest version
+    lenv install 5       ; that picks the latest minor version and patch version
+    lenv install 5.4     ; that picks the latest patch version
+    lenv install lj-v2.1 ; that picks the version of luajit
 
     lenv install latest:latest ; that picks the the latest version of lua and
-                               ; luarocks
+                               ; luarocks in current lua environment
     lenv install :latest       ; that picks the the latest version of luarocks
+                                 in current lua environment
+
+    If a version of luarocks is specified, the operation will target the lua
+	environment currently in use.
 
   uninstall <version>            Uninstall a <version> of lua
   uninstall-lj <version>         Uninstall a <version> of luajit
