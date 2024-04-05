@@ -45,6 +45,7 @@ Commands:
   ls                             List installed versions
   install <version> <opt...>     Install and use a <version> of lua
   use <version>                  Use a <version> of lua
+  uninstall <version>            Uninstall a <version> of lua
 
   Note:
     The <version> specifier of the above commands can be specified as follows;
@@ -59,12 +60,9 @@ Commands:
     lenv install :latest       ; that picks the the latest version of luarocks
                                  in current lua environment
 
-    If a version of luarocks is specified, the operation will target the lua
-	environment currently in use.
-
-  uninstall <version>            Uninstall a <version> of lua
-  uninstall-lj <version>         Uninstall a <version> of luajit
-  uninstall-rocks <version>      Uninstall a <version> of luarocks
+    If the version of luarocks is specified along with the version of lua, the
+    operation will target the specified version of the lua environment.
+    Otherwise, the operation will target the current lua environment.
 `)
 	osExit(rc)
 }

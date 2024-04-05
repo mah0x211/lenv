@@ -349,14 +349,7 @@ func start() {
 		CmdInstall(argv[1:])
 
 	case "uninstall":
-		CmdUninstall(LuaCfg, argv[1:])
-
-	case "uninstall-lj":
-		CmdUninstall(LuaJitCfg, argv[1:])
-
-	case "uninstall-rocks":
-		CheckLuaRocksRootDir()
-		CmdUninstall(LuaRocksCfg, argv[1:])
+		CmdUninstall(argv[1:])
 
 	case "use":
 		CmdUse(argv[1:])
