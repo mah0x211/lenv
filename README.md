@@ -186,8 +186,8 @@ lenv manages the following directories.
 │   └── luarocks/<ver>      -> luarocks installation directory for lua/<ver>
 │       └── lua_modules
 │           ├── bin         -> symlink to `luarocks/<ver>/bin`
-│           ├── lualib/<N>  -> symlink to LUA_PATH/LUA_CPATH directories under 
-│           └── luaclib/<N>    the luarocks/<ver> directory
+│           ├── lualib/     -> symlink to LUA_PATH/LUA_CPATH directories under 
+│           └── luaclib/       the luarocks/<ver> directory
 │
 ├── luajit/<ver>            -> luajit installation directory
 │   │

@@ -2,26 +2,18 @@ package main
 
 import (
 	"path/filepath"
-	"strconv"
 	"strings"
 )
 
 func get_luacpath() string {
-	prefix := filepath.Clean(CurrentDir+"/lua_modules/luaclib") + "/"
-	paths := []string{}
-	for i := 0; i <= 10; i++ {
-		dir := prefix + strconv.Itoa(i)
-		paths = append(paths, dir+"/?.so")
-	}
-	return strings.Join(paths, ";") + ";;"
+	return filepath.Clean(CurrentDir+"/lua_modules/luaclib") + "/?.so;;"
 }
 
 func get_luapath() string {
-	prefix := filepath.Clean(CurrentDir+"/lua_modules/lualib") + "/"
-	paths := []string{}
-	for i := 0; i <= 10; i++ {
-		dir := prefix + strconv.Itoa(i)
-		paths = append(paths, dir+"/?.lua", dir+"/?/init.lua")
+	prefix := filepath.Clean(CurrentDir + "/lua_modules/lualib")
+	paths := []string{
+		prefix + "/?.lua",
+		prefix + "/?/init.lua",
 	}
 	return strings.Join(paths, ";") + ";;"
 }
