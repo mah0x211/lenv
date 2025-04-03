@@ -27,7 +27,7 @@ func postInstallLuaRocks(instdir string) error {
 		return err
 	}
 
-	envs := map[string]MapStringSet{}
+	symlinks := map[string]string{}
 	for _, line := range strings.Split(buf.String(), "\n") {
 		arr := strings.SplitN(line, "='", 2)
 		if len(arr) != 2 {
@@ -36,61 +36,63 @@ func postInstallLuaRocks(instdir string) error {
 
 		switch arr[0] {
 		case "export LUA_PATH", "export LUA_CPATH":
-			paths := MapStringSet{}
 			name := strings.TrimPrefix(arr[0], "export ")
-			path := strings.TrimSuffix(arr[1], "'")
-
 			if name == "LUA_PATH" {
 				name = "lua_modules/lualib"
 			} else if name == "LUA_CPATH" {
 				name = "lua_modules/luaclib"
 			}
 
+			dirnames := map[string]bool{}
+			path := strings.TrimSuffix(arr[1], "'")
 			for _, v := range strings.Split(path, ";") {
-				// use the path under installation directory
+				// use only the path under the installation directory
 				if strings.HasPrefix(v, instdir) {
+					// extract dirname from path
 					kv := strings.SplitN(v, "/?", 2)
 					if len(kv) != 2 || !filepath.IsAbs(kv[0]) {
+						// ignore invalid path format
 						continue
-					} else if err := mkdir(kv[0]); err != nil {
+					}
+					// trim instdir prefix and leading /
+					dirname := filepath.Clean(kv[0])
+					dirname = strings.TrimPrefix(dirname, instdir)
+					dirname = strings.TrimPrefix(dirname, "/")
+
+					// ignore if it is already extracted
+					if _, ok := dirnames[dirname]; ok {
+						continue
+					}
+					dirnames[dirname] = true
+
+					// create directory if not exists
+					printf("mkdir -p %s", dirname)
+					if err := mkdir(dirname); err != nil {
 						return err
 					}
-
-					kv[0] = strings.TrimPrefix(kv[0], instdir)
-					kv[1] = "/?" + kv[1]
-					for i, v := range kv {
-						kv[i] = filepath.Clean(v)
-					}
-					paths.Set(kv[0], kv[1])
+					symlinks[name] = dirname
 				}
-			}
-
-			if len(paths) > 0 {
-				envs[name] = paths
 			}
 		default:
 			continue
 		}
 	}
 
+	// current directory: luarocks/<version>/
 	// create symlink:
 	// 	./lua_modules/bin		-> ../bin
-	// 	./lua_modules/lualib/* 	-> ../../<lua_path>
-	// 	./lua_modules/luaclib/* -> ../../<lua_cpath>
-	printf("ln -s ./bin ./lua_moduels/bin")
+	// 	./lua_modules/lualib 	-> ../<lua_path>
+	// 	./lua_modules/luaclib   -> ../<lua_cpath>
+	printf("ln -s ../bin ./lua_modules/bin")
 	if err := createSymlink("../bin", "./lua_modules/bin"); err != nil {
 		return err
 	}
-	for name, paths := range envs {
-		var n int
-		for k, v := range paths {
-			printf("ln -s .%s ./%s/%d | %#v", k, name, n, v.Value())
-			if err := createSymlink(
-				"../.."+k, fmt.Sprintf("./%s/%d", name, n),
-			); err != nil {
-				return err
-			}
-			n++
+	for target, dirname := range symlinks {
+		printf("ln -s ../%s ./%s", dirname, target)
+		if err := createSymlink(
+			fmt.Sprintf("../%s", dirname), fmt.Sprintf("./%s", target),
+		); err != nil {
+			return err
 		}
 	}
 
