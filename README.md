@@ -10,12 +10,13 @@ Lua Version Manager.
 ## Installation
 
 1. download a binary release from the [releases](https://github.com/mah0x211/lenv/releases) page.
-2. extract the downloaded file and place the `lenv` command in the desired location. (e.g. `/usr/local/bin/lenv`)
+2. extract and place the `lenv` command in your PATH (e.g. `/usr/local/bin/lenv`).
 3. run a `lenv setup` command to set up the required files and directories.
-    - run `lenv -g setup` command to set up in the global directory.
-    - run `lenv -p setup` command to set up in the project (current) directory.
+    - For default (`$HOME/.lenv`) setup: `lenv setup`
+    - For global (`/usr/local/lenv`) setup: `lenv -g setup`
+    - For project-local (`current directory`) setup: `lenv -p setup`
 
-**Setting up the `.lenvrc` file.**
+### Shell configuration
 
 1. run `lenv path > ~/.lenvrc` command to create the `lenvrc` file.
     - if you set up the required files and directories in the `/usr/local/lenv` directory, you should run a `lenv -g path > ~/.lenvrc` command.
@@ -47,7 +48,7 @@ Options:
     becomes the install directory.
     If it finds no .lenv directory, it uses /usr/local/lenv if it exists;
     otherwise, it uses $HOME/.lenv (e.g., /home/foo/.lenv). The default
-	directory is used even if it doesn't exist yet.
+    directory is used even if it doesn't exist yet.
 
     For example, with this directory structure:
 
@@ -120,9 +121,9 @@ $ lenv vers
 ...snip...
 ```
 
-**Package URL's**
+**Package URLs**
 
-the following URL's are used to download the version files and source files.
+the following URLs are used to download the version files and source files.
 
 - Lua: https://lua.org/ftp/
 - LuaJIT: https://github.com/LuaJIT/LuaJIT.git
@@ -174,7 +175,7 @@ LuaRocks main command-line interface
 ```
 
 
-### Installation Locations 
+### Installation Locations
 
 lenv manages the following directories.
 
