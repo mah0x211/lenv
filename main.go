@@ -49,7 +49,7 @@ var (
 	}
 )
 
-func init_global_vars(inst_globally bool) {
+func init_global_vars(basedir string) {
 	// get current working directory
 	wd, err := os.Getwd()
 	if err != nil {
@@ -57,9 +57,42 @@ func init_global_vars(inst_globally bool) {
 	}
 	CWD = wd
 
-	if inst_globally {
+	// check basedir
+	if basedir == "global" {
 		// set LenvDir to /usr/local/lenv
-		LenvDir = filepath.Join("/usr/local/lenv")
+		LenvDir = "/usr/local/lenv"
+	} else if basedir == "project" {
+		// set LenvDir to $PWD/.lenv
+		LenvDir = filepath.Join(CWD, ".lenv")
+	} else if basedir != "" {
+		panic("unknown basedir: " + basedir)
+	} else {
+		// find .lenv directory in current directory up to root
+		dir := CWD
+		target := ""
+		for len(dir) > 0 {
+			// Check if .lenv exists in the current directory
+			target = filepath.Join(dir, ".lenv")
+			if ok, _ := isDir(target); ok {
+				break
+			}
+			target = ""
+
+			if dir == "/" {
+				// reached root directory, stop searching
+				break
+			}
+			// move up to parent directory
+			dir = filepath.Dir(dir)
+		}
+
+		if len(target) > 0 {
+			LenvDir = target
+		} else if ok, _ := isDir("/usr/local/lenv"); ok {
+			// use global directory if it exists
+			LenvDir = "/usr/local/lenv"
+		}
+		// else { // use default directory ($HOME/.lenv) }
 	}
 
 	SrcDir = filepath.Join(LenvDir, "src")
@@ -315,13 +348,17 @@ func PickTargetVersion(vers string, exactMatch bool) *TargetVersion {
 
 func start() {
 	argv := os.Args[1:]
+	basedir := ""
 	if len(argv) > 0 {
-		inst_globally := argv[0] == "-g" || argv[0] == "--global"
-		if inst_globally {
+		if argv[0] == "-g" || argv[0] == "--global" {
 			argv = argv[1:]
+			basedir = "global"
+		} else if argv[0] == "-p" || argv[0] == "--project" {
+			argv = argv[1:]
+			basedir = "project"
 		}
-		init_global_vars(inst_globally)
 	}
+	init_global_vars(basedir)
 
 	if len(argv) == 0 || argv[0] == "help" {
 		CmdHelp(0)

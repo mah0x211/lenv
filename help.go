@@ -24,6 +24,33 @@ Usage:
 
 Options:
   -g, --global                   Use /usr/local/lenv as installation directory
+  -p, --project                  Use current directory as installation directory
+
+  Note:
+    The lenv command searches for a .lenv directory in the current directory,
+    then recursively in each parent directory up to the root. If found, that
+    becomes the install directory.
+    If it finds no .lenv directory, it uses /usr/local/lenv if it exists;
+    otherwise, it uses $HOME/.lenv (e.g., /home/foo/.lenv). The default
+	directory is used even if it doesn't exist yet.
+
+    For example, with this directory structure:
+
+      /
+      ├── home
+      │   └── foo
+      │       ├── .lenv
+      │       └── bar
+      │           └── baz
+      │               └── .lenv
+      └── qux
+
+    If you run lenv:
+    - in baz, it uses baz/.lenv.
+    - in bar, it uses foo/.lenv.
+    - in qux, it finds no .lenv directory, so it uses /usr/local/lenv if it
+	  exists; otherwise, $HOME/.lenv (i.e., /home/foo/.lenv).
+
 
 Commands:
   help                           Show this message
