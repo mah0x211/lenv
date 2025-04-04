@@ -17,21 +17,30 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-      # -
-      #   name: Install APT Packages
-      #   run: |
-      #     sudo apt update
-      #     sudo apt-get -V install -y make gcc
-      - name: Install Go
+      -
+        name: Install APT Packages (Linux only)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install luarocks
+          echo "/usr/local/bin" >> $GITHUB_PATH
+      -
+        name: Install Homebrew Packages (macOS only)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install luarocks
+          echo "/opt/homebrew/bin" >> $GITHUB_PATH
+      -
+        name: Install Go
         uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
-
-      - name: Checkout code
+      -
+        name: Checkout code
         uses: actions/checkout@v2
-
-      - name: Test
+      -
+        name: Test
         run: make test
-
-      - name: Codecov
+      -
+        name: Codecov
         uses: codecov/codecov-action@v3
