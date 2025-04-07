@@ -8,59 +8,48 @@ import (
 	"strings"
 )
 
-func GetLuaRocksPath() map[string][]map[string]string {
+func GetLuaPackagePaths() map[string][]string {
 	// get luarocks pathnames
 	var buf bytes.Buffer
-	if err := DoExecEx("luarocks", &buf, os.Stderr, "path"); err != nil {
-		fatalf("failed to get luarocks path: %v", err)
+	if err := DoExecEx("lua", &buf, os.Stderr, "-e", `
+for k, s in  pairs({
+    LUA_PATH = package.path,
+    LUA_CPATH = package.cpath,
+}) do
+    io.write(k .. '=')
+    local patterns = {}
+    s:gsub('%?/?[^;/]+', function(v)
+        if not patterns[v] then
+            patterns[v] = true
+            patterns[#patterns + 1] = v
+        end
+    end)
+    table.sort(patterns)
+    io.write(table.concat(patterns, ';'), '\n')
+end
+	`); err != nil {
+		fatalf("failed to get lua path: %v", err)
 	}
 
-	pathnames := map[string][]map[string]string{}
+	pathnames := map[string][]string{}
 	for _, line := range strings.Split(buf.String(), "\n") {
-		arr := strings.SplitN(line, "='", 2)
-		if len(arr) != 2 || !strings.HasPrefix(arr[0], "export ") {
+		arr := strings.SplitN(line, "=", 2)
+		if len(arr) != 2 {
 			continue
 		}
-		name := strings.TrimPrefix(arr[0], "export ")
-		paths := strings.TrimSuffix(arr[1], "'")
+		name := arr[0]
+		paths := arr[1]
 
 		switch name {
-		case "PATH":
-			for _, v := range strings.Split(paths, ":") {
-				pathname := pathnames[name]
-				if pathname == nil {
-					pathname = []map[string]string{}
-					pathnames[name] = pathname
-				}
-				pathname = append(pathname, map[string]string{
-					"pathname": v,
-				})
-				// sort by pathname
-				// sort.Slice(pathname, func(i, j int) bool {
-				// 	return pathname[i]["pathname"] < pathname[j]["pathname"]
-				// })
-			}
-
 		case "LUA_PATH", "LUA_CPATH":
 			for _, v := range strings.Split(paths, ";") {
 				// extract object extension
-				kv := strings.SplitN(v, "/?", 2)
-				if len(kv) == 2 {
-					pathname := pathnames[name]
-					if pathname == nil {
-						pathname = []map[string]string{}
-					}
-					pathname = append(pathname, map[string]string{
-						"pathname": v,
-						"dirname":  kv[0],
-						"basename": "?" + kv[1],
-					})
-					// sort by pathname
-					// sort.Slice(pathname, func(i, j int) bool {
-					// 	return pathname[i]["pathname"] < pathname[j]["pathname"]
-					// })
-					pathnames[name] = pathname
+				pathname := pathnames[name]
+				if pathname == nil {
+					pathname = []string{}
 				}
+				pathname = append(pathname, v)
+				pathnames[name] = pathname
 			}
 		}
 	}
@@ -68,10 +57,10 @@ func GetLuaRocksPath() map[string][]map[string]string {
 	return pathnames
 }
 
-func getLuaCPath(rockspath map[string][]map[string]string) string {
+func getLuaCPath(rockspath map[string][]string) string {
 	if len(rockspath) == 0 {
 		// extract LUA_CPATH from luarocks
-		rockspath = GetLuaRocksPath()
+		rockspath = GetLuaPackagePaths()
 	}
 	cpath := rockspath["LUA_CPATH"]
 	if cpath == nil {
@@ -80,8 +69,8 @@ func getLuaCPath(rockspath map[string][]map[string]string) string {
 
 	// get unique basenames
 	basenames := map[string]bool{}
-	for _, pathname := range cpath {
-		basenames[pathname["basename"]] = true
+	for _, basename := range cpath {
+		basenames[basename] = true
 	}
 
 	prefix := filepath.Join(CurrentDir, "lua_modules/luaclib")
@@ -92,10 +81,10 @@ func getLuaCPath(rockspath map[string][]map[string]string) string {
 	return strings.Join(pathnames, ";") + ";;"
 }
 
-func getLuaPath(rockspath map[string][]map[string]string) string {
+func getLuaPath(rockspath map[string][]string) string {
 	if len(rockspath) == 0 {
 		// extract LUA_PATH from luarocks
-		rockspath = GetLuaRocksPath()
+		rockspath = GetLuaPackagePaths()
 	}
 	luapath := rockspath["LUA_PATH"]
 	if luapath == nil {
@@ -104,8 +93,8 @@ func getLuaPath(rockspath map[string][]map[string]string) string {
 
 	// get unique basenames
 	basenames := map[string]bool{}
-	for _, pathname := range luapath {
-		basenames[pathname["basename"]] = true
+	for _, basename := range luapath {
+		basenames[basename] = true
 	}
 
 	prefix := filepath.Join(CurrentDir, "lua_modules/lualib")
@@ -124,7 +113,7 @@ func getPath() string {
 }
 
 func printAll() {
-	rockspath := GetLuaRocksPath()
+	rockspath := GetLuaPackagePaths()
 
 	printf(`
 #
