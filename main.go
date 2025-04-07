@@ -391,6 +391,9 @@ func start() {
 	case "use":
 		CmdUse(argv[1:])
 
+	case "current":
+		CmdCurrent(argv[1:])
+
 	default:
 		CmdHelp(1, "unknown command %q", argv[0])
 	}
