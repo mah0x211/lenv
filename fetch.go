@@ -139,7 +139,7 @@ func CmdFetch() {
 				continue
 			}
 			os.RemoveAll(target.cfg.RepoDir)
-			if err = os.Rename(tmpdir, target.cfg.RepoDir); err != nil {
+			if err = Copy(tmpdir, target.cfg.RepoDir); err != nil {
 				eprintf("failed to rename %q to %q: %v\n", tmpdir, target.cfg.RepoDir, err)
 				continue
 			}
