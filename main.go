@@ -398,7 +398,8 @@ func start() {
 
 var ErrNotSymlink = fmt.Errorf("not a symlink")
 
-func evalSymlink(file string) (string, error) {
+func EvalSymlink(file string) (string, error) {
+	file = filepath.Clean(file)
 	if mode, err := getFileMode(file); err != nil {
 		return "", err
 	} else if mode == 0 {
@@ -419,11 +420,11 @@ func ResolveCurrentDir() {
 	}
 
 	// resolve CurrentDir
-	if dir, err := evalSymlink(CurrentDir); err != nil {
+	if dir, err := EvalSymlink(CurrentDir); err != nil {
 		if errors.Is(err, ErrNotSymlink) {
 			abortf("%q is not symlink.\nplease remove it yourself", CurrentDir)
 		} else if !os.IsNotExist(err) {
-			abortf("failed to evalSymlink(): %#v", err)
+			abortf("failed to EvalSymlink(): %#v", err)
 		}
 		os.Remove(CurrentDir)
 	} else if dir != "" {
