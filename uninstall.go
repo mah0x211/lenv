@@ -1,8 +1,11 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func uninstall(t *Target) {
@@ -35,6 +38,24 @@ func CmdUninstall(opts []string) {
 	// uninstall the specified version of luarocks
 	if target.LuaRocks != nil {
 		CheckLuaRocksRootDir()
+
+		// check if lua_modules is a symlink to target luarocks version
+		shouldRemoveSymlink := false
+		symlink := fmt.Sprintf("%s/lua_modules", CurrentDir)
+		rocksdir := filepath.Join(target.LuaRocks.Config.RootDir, target.LuaRocks.Version.Ver)
+		if pathname, err := EvalSymlink(symlink); err != nil && !errors.Is(err, ErrNotSymlink) && !os.IsNotExist(err) {
+			fatalf("failed to EvalSymlink(): %#v", err)
+		} else {
+			shouldRemoveSymlink = strings.HasPrefix(pathname, rocksdir)
+		}
+
 		uninstall(target.LuaRocks)
+
+		if shouldRemoveSymlink {
+			if err := os.Remove(symlink); err != nil {
+				fatalf("failed to remove symlink %q: %v", symlink, err)
+			}
+			printf("symlink %q has been removed.", symlink)
+		}
 	}
 }
