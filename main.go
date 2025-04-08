@@ -140,6 +140,10 @@ func printf(format string, v ...interface{}) {
 	fmt.Printf(format+"\n", v...)
 }
 
+func println(v ...interface{}) {
+	fmt.Println(v...)
+}
+
 func lstat(file string) (os.FileInfo, error) {
 	info, err := os.Lstat(file)
 	if err != nil {
@@ -390,6 +394,9 @@ func start() {
 
 	case "use":
 		CmdUse(argv[1:])
+
+	case "current":
+		CmdCurrent(argv[1:])
 
 	default:
 		CmdHelp(1, "unknown command %q", argv[0])

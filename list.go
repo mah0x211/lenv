@@ -59,7 +59,7 @@ func listRocks(luadir string) {
 
 	if len(vers) > 0 {
 		format := fmt.Sprintf("    %%s %%-%ds", maxlen)
-		printf(" └ luarocks")
+		println(" └ luarocks")
 		tail := len(vers) - 1
 		for i, v := range vers {
 			c := "├"
@@ -126,6 +126,6 @@ func CmdList() {
 			}
 			listRocks(dir)
 		}
-		printf("")
+		println("")
 	}
 }

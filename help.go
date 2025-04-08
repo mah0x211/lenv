@@ -16,7 +16,7 @@ func CmdHelp(rc int, msgs ...interface{}) {
 		printf(fmtstr, msgs[1:]...)
 	}
 
-	printf(`
+	println(`
 lenv - lua version manager
 
 Usage:
@@ -32,7 +32,7 @@ Options:
     becomes the install directory.
     If it finds no .lenv directory, it uses /usr/local/lenv if it exists;
     otherwise, it uses $HOME/.lenv (e.g., /home/foo/.lenv). The default
-	directory is used even if it doesn't exist yet.
+    directory is used even if it doesn't exist yet.
 
     For example, with this directory structure:
 
@@ -49,8 +49,7 @@ Options:
     - in baz, it uses baz/.lenv.
     - in bar, it uses foo/.lenv.
     - in qux, it finds no .lenv directory, so it uses /usr/local/lenv if it
-	  exists; otherwise, $HOME/.lenv (i.e., /home/foo/.lenv).
-
+      exists; otherwise, $HOME/.lenv (i.e., /home/foo/.lenv).
 
 Commands:
   help                           Show this message
@@ -66,6 +65,15 @@ Commands:
 
     if <target> is not specified, all the above paths of the current lua
     environment will be shown.
+
+  current <target>               Show the current used version of lua/luarocks
+
+  Note:
+    The <target> specifier of the above commands can be specified as follows;
+
+    lenv current          ; show the current used version of lua and luarocks
+    lenv current lua      ; show the current used version of lua
+    lenv current luarocks ; show the current used version of luarocks
 
   fetch                          Fetch remote versions
   vers                           List available versions
@@ -94,6 +102,6 @@ Commands:
     In the case of the 'uninstall' command, the version specifier must match the
     target version exactly. Also, if the version of luarocks is specified along
     with the version of lua, the version specifier of luarocks is ignored.
-`)
+`, "")
 	osExit(rc)
 }

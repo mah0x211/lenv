@@ -20,7 +20,7 @@ func postInstallLuaRocks(instdir string) error {
 		return err
 	}
 
-	printf("create lua_modules directory")
+	println("create lua_modules directory")
 	bin := fmt.Sprintf("%s/bin/luarocks", instdir)
 	var buf bytes.Buffer
 	if err := DoExecEx(bin, &buf, os.Stderr, "path"); err != nil {
@@ -83,7 +83,7 @@ func postInstallLuaRocks(instdir string) error {
 	// 	./lua_modules/bin		-> ../bin
 	// 	./lua_modules/lualib 	-> ../<lua_path>
 	// 	./lua_modules/luaclib   -> ../<lua_cpath>
-	printf("ln -s ../bin ./lua_modules/bin")
+	println("ln -s ../bin ./lua_modules/bin")
 	if err := createSymlink("../bin", "./lua_modules/bin"); err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func untarGz(dir string, data io.Reader) (string, error) {
 			return "", err
 		}
 
-		printf("%s", h.Name)
+		println(h.Name)
 		switch h.Typeflag {
 		case tar.TypeReg, tar.TypeRegA:
 			if !checked {
@@ -237,7 +237,7 @@ func installRocks(instdir string, cfg *TargetConfig) error {
 		return err
 	}
 
-	printf("postflight...")
+	println("postflight...")
 	return postInstallLuaRocks(instdir)
 }
 
@@ -266,7 +266,7 @@ func installLuaJit(instdir string, opts []string) error {
 		return err
 	}
 
-	printf("make install PREFIX=" + instdir)
+	printf("make install PREFIX=%s", instdir)
 	if err := DoExec("make", "install", "PREFIX="+instdir); err != nil {
 		return err
 	}
@@ -278,7 +278,7 @@ func installLuaJit(instdir string, opts []string) error {
 		return err
 	}
 
-	printf("postflight...")
+	println("postflight...")
 	return postInstallLuaJit(instdir)
 }
 
@@ -288,7 +288,7 @@ func installLua(instdir string, opts []string) error {
 		return err
 	}
 
-	printf("make install INSTALL_TOP=" + instdir)
+	printf("make install INSTALL_TOP=%s", instdir)
 	return DoExec("make", "install", "INSTALL_TOP="+instdir)
 }
 
@@ -396,7 +396,7 @@ func doInstall(cfg *TargetConfig, item *VerItem, opts []string) {
 
 		dir, err = extractCachedFile(tmpdir, url)
 		if dir != "" {
-			printf("use cached file")
+			println("use cached file")
 		} else {
 			if err != nil {
 				printf("failed to extract cached file: %v", err)

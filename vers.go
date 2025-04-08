@@ -297,7 +297,7 @@ func PickTargetVersionItem(cfg *TargetConfig, ver string, exactMatch bool) *VerI
 	}
 
 	if item == nil {
-		printf("not found")
+		println("not found")
 		fatalf("%s version %q does not defined in %q\n%s", cfg.Name, ver, cfg.VersionFile, ListTargetVersions(cfg))
 	} else if item.SemVer != nil && item.Ext != ".tar.gz" {
 		fatalf("unsupported media-type %q", item.Name)

@@ -170,8 +170,8 @@ func CmdFetch() {
 		if vers != nil {
 			makeVerFile(target.cfg, vers)
 		}
-		printf("")
+		println("")
 	}
-	printf("")
-	printf("done")
+	println("")
+	println("done")
 }
