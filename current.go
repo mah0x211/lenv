@@ -54,20 +54,20 @@ func CmdCurrent(opts []string) {
 	if len(opts) > 0 {
 		switch opts[0] {
 		case "lua":
-			printf("%s", getCurrentLuaVer())
+			println(getCurrentLuaVer())
 			return
 
 		case "luarocks":
-			printf("%s", getCurrentLuaRocksVer())
+			println(getCurrentLuaRocksVer())
 			return
 		}
 	}
 
 	ver := getCurrentLuaVer()
-	printf("%s", ver)
+	println(ver)
 	if ver != "" {
 		if ver = getCurrentLuaRocksVer(); ver != "" {
-			printf("%s", ver)
+			println(ver)
 		}
 	}
 }

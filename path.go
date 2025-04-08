@@ -115,11 +115,10 @@ func getPath() string {
 func printAll() {
 	rockspath := GetLuaPackagePaths()
 
-	printf(`
+	println(`
 #
 # please add the following lenv settings to your environment
-#
-`)
+#`)
 
 	for _, name := range []string{"PATH", "LUA_PATH", "LUA_CPATH"} {
 		var value string
@@ -135,22 +134,22 @@ func printAll() {
 		}
 		printf(`export %s="%s"`, name, value)
 	}
-	printf("")
+	println("")
 }
 
 func CmdPath(opts []string) {
 	if len(opts) > 0 {
 		switch opts[0] {
 		case "bin":
-			printf(getPath())
+			println(getPath())
 			return
 
 		case "lualib":
-			printf(getLuaPath(nil))
+			println(getLuaPath(nil))
 			return
 
 		case "luaclib":
-			printf(getLuaCPath(nil))
+			println(getLuaCPath(nil))
 			return
 		}
 	}

@@ -16,7 +16,7 @@ func CmdHelp(rc int, msgs ...interface{}) {
 		printf(fmtstr, msgs[1:]...)
 	}
 
-	printf(`
+	println(`
 lenv - lua version manager
 
 Usage:
@@ -102,6 +102,6 @@ Commands:
     In the case of the 'uninstall' command, the version specifier must match the
     target version exactly. Also, if the version of luarocks is specified along
     with the version of lua, the version specifier of luarocks is ignored.
-`)
+`, "")
 	osExit(rc)
 }

@@ -140,6 +140,10 @@ func printf(format string, v ...interface{}) {
 	fmt.Printf(format+"\n", v...)
 }
 
+func println(v ...interface{}) {
+	fmt.Println(v...)
+}
+
 func lstat(file string) (os.FileInfo, error) {
 	info, err := os.Lstat(file)
 	if err != nil {
