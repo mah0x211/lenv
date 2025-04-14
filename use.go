@@ -41,6 +41,13 @@ func UseInstalledVersion(cfg *TargetConfig, ver string) {
 			}
 
 			printf("use %s version %s (%q)", cfg.Name, ver, src)
+
+			if err := os.Chdir(CWD); err != nil {
+				fatalf("failed to chdir to %q: %v", CWD, err)
+			} else if cfg.Name != "luarocks" {
+				// resolve current dir if it is not luarocks
+				ResolveCurrentDir()
+			}
 			return
 		}
 	}
