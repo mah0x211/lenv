@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -167,12 +168,40 @@ func NewVersionsFromFile(filename string) (*Versions, error) {
 	return vers, nil
 }
 
+// WriteFile publishes a complete version list without truncating the old file.
 func (vers *Versions) WriteFile(filename string) error {
 	b, err := json.MarshalIndent(vers.dict, "", "  ")
 	if err != nil {
 		return err
 	}
-	return writeFile(filename, 0, bytes.NewReader(b))
+	if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
+		return err
+	}
+	mode := os.FileMode(0644)
+	if info, err := os.Stat(filename); err == nil {
+		mode = info.Mode().Perm()
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	f, err := os.CreateTemp(filepath.Dir(filename), ".lenv-versions-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+	if err := f.Chmod(mode); err != nil {
+		return err
+	}
+	if _, err := io.Copy(f, bytes.NewReader(b)); err != nil {
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(f.Name(), filename)
 }
 
 func (vers *Versions) ReadFile(filename string) error {
