@@ -88,10 +88,10 @@ func parseLuaVers(v interface{}) *Versions {
 	return vers
 }
 
-func makeVerFile(cfg *TargetConfig, vers *Versions) {
+func makeVerFile(cfg *TargetConfig, vers *Versions) bool {
 	if err := vers.WriteFile(cfg.VersionFile); err != nil {
 		eprintf("failed to write version file: %v\n", err)
-		return
+		return false
 	}
 
 	items, maxlen := vers.GetList()
@@ -105,9 +105,11 @@ func makeVerFile(cfg *TargetConfig, vers *Versions) {
 		url := cfg.DownloadURL + filepath.Clean(item.Name)
 		printf(format, item.Ver, url)
 	}
+	return true
 }
 
-func CmdFetch() {
+func CmdFetch() bool {
+	success := true
 	for _, target := range []struct {
 		cfg   *TargetConfig
 		parse ParseFunc
@@ -128,6 +130,7 @@ func CmdFetch() {
 			tmpdir, err := os.MkdirTemp(os.TempDir(), "lenv-")
 			if err != nil {
 				eprintf("failed to create temp dir: %v\n", err)
+				success = false
 				continue
 			}
 			defer os.RemoveAll(tmpdir)
@@ -136,11 +139,17 @@ func CmdFetch() {
 			err = DoExec("git", "clone", "--depth", "1", "--no-single-branch", target.cfg.ReleaseURL, tmpdir)
 			if err != nil {
 				eprintf("failed to clone %q: %v\n", target.cfg.ReleaseURL, err)
+				success = false
 				continue
 			}
-			os.RemoveAll(target.cfg.RepoDir)
+			if err := os.RemoveAll(target.cfg.RepoDir); err != nil {
+				eprintf("failed to remove repository: %v", err)
+				success = false
+				continue
+			}
 			if err = Copy(tmpdir, target.cfg.RepoDir); err != nil {
 				eprintf("failed to rename %q to %q: %v\n", tmpdir, target.cfg.RepoDir, err)
+				success = false
 				continue
 			}
 			vers = target.parse(target.cfg.RepoDir)
@@ -149,6 +158,7 @@ func CmdFetch() {
 			rsp, err := http.Get(target.cfg.ReleaseURL)
 			if err != nil {
 				eprintf("failed to download %q: %v\n", target.cfg.ReleaseURL, err)
+				success = false
 				continue
 			}
 			defer rsp.Body.Close()
@@ -156,22 +166,30 @@ func CmdFetch() {
 			// check status code
 			if rsp.StatusCode != http.StatusOK {
 				eprintf("failed to download %q: %s\n", target.cfg.ReleaseURL, rsp.Status)
+				success = false
 				continue
 			}
 
 			b, err := io.ReadAll(rsp.Body)
 			if err != nil {
 				eprintf("failed to read body: %v\n", err)
+				success = false
 				continue
 			}
 			vers = target.parse(b)
 		}
 
-		if vers != nil {
-			makeVerFile(target.cfg, vers)
+		if vers == nil || len(vers.dict) == 0 {
+			eprintf("no versions found for %s", target.cfg.Name)
+			success = false
+		} else if !makeVerFile(target.cfg, vers) {
+			success = false
 		}
 		println("")
 	}
 	println("")
-	println("done")
+	if success {
+		println("done")
+	}
+	return success
 }
