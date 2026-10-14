@@ -377,7 +377,19 @@ func switchBranch(repodir, remote, branch string) error {
 	return DoExec("git", "checkout", ".")
 }
 
-func doInstall(cfg *TargetConfig, item *VerItem, opts []string) {
+func doInstall(cfg *TargetConfig, item *VerItem, opts []string, ifMissing bool) {
+	instdir := filepath.Join(cfg.RootDir, item.Ver)
+	if ifMissing {
+		installed, err := isDir(instdir)
+		if err != nil {
+			fatalf("failed to check installation directory: %v", err)
+		}
+		if installed {
+			printf("%s version %s is already installed.", cfg.Name, item.Ver)
+			UseInstalledVersion(cfg, item.Ver)
+			return
+		}
+	}
 	printf("install %q", item.Ver)
 
 	var dir string
@@ -407,7 +419,6 @@ func doInstall(cfg *TargetConfig, item *VerItem, opts []string) {
 		}
 	}
 
-	instdir := filepath.Join(cfg.RootDir, item.Ver)
 	printf("remove old directory: %s", instdir)
 	if err := os.RemoveAll(instdir); err != nil {
 		fatalf("failed to os.RemoveAll(): %v", err)
@@ -440,9 +451,10 @@ func doInstall(cfg *TargetConfig, item *VerItem, opts []string) {
 }
 
 type installOptions struct {
-	fetch   bool
-	version string
-	build   []string
+	fetch     bool
+	ifMissing bool
+	version   string
+	build     []string
 }
 
 func parseInstallOptions(args []string) (*installOptions, error) {
@@ -451,6 +463,8 @@ func parseInstallOptions(args []string) (*installOptions, error) {
 		switch args[0] {
 		case "--fetch":
 			options.fetch = true
+		case "--if-missing":
+			options.ifMissing = true
 		default:
 			return nil, fmt.Errorf("unknown install option %q", args[0])
 		}
@@ -479,11 +493,11 @@ func prepareInstall(args []string) (*TargetVersion, *installOptions) {
 func CmdInstall(opts []string) {
 	target, options := prepareInstall(opts)
 	if target.Lua != nil {
-		doInstall(target.Lua.Config, target.Lua.Version, options.build)
+		doInstall(target.Lua.Config, target.Lua.Version, options.build, options.ifMissing)
 	}
 	if target.LuaRocks != nil {
 		ResolveCurrentDir()
 		CheckLuaRocksRootDir()
-		doInstall(target.LuaRocks.Config, target.LuaRocks.Version, options.build)
+		doInstall(target.LuaRocks.Config, target.LuaRocks.Version, options.build, options.ifMissing)
 	}
 }
