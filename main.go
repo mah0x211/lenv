@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -106,7 +105,7 @@ func init_global_vars(basedir string) {
 	LuaJitCfg.VersionFile = filepath.Join(LenvDir, "luajit_vers.txt")
 	LuaRocksCfg.VersionFile = filepath.Join(LenvDir, "luarocks_vers.txt")
 
-	ResolveCurrentDir()
+	LuaRocksCfg.RootDir = ""
 }
 
 func eprintf(format string, v ...interface{}) {
@@ -268,32 +267,6 @@ func writeFile(file string, perm os.FileMode, src io.Reader) error {
 	return nil
 }
 
-func hasRequiredDirs() bool {
-	// check required directories
-	for _, dir := range []string{
-		LenvDir, SrcDir, LuaCfg.RootDir, LuaJitCfg.RootDir,
-	} {
-		if info, err := lstat(dir); err != nil {
-			fatalf("- %q: cannot read metadata - %s", dir, err)
-		} else if info == nil {
-			return false
-		} else if !info.IsDir() {
-			return false
-		}
-	}
-	return true
-}
-
-func checkInitialized() {
-	if !hasRequiredDirs() {
-		eprintf(`
-ERROR: the required directory does not exists.
-       please run 'lenv setup' before use.
-`)
-		CmdHelp(1)
-	}
-}
-
 func CheckLuaRocksRootDir() {
 	if LuaRocksCfg.RootDir == "" {
 		fatalf("%q does not exist.\nplease run `lenv use <ver>` before installing or uninstalling luarocks", CurrentDir)
@@ -353,26 +326,45 @@ func PickTargetVersion(vers string, exactMatch bool) *TargetVersion {
 func start() {
 	argv := os.Args[1:]
 	basedir := ""
-	if len(argv) > 0 {
-		if argv[0] == "-g" || argv[0] == "--global" {
-			argv = argv[1:]
+	startupRecovery.enabled = false
+options:
+	for len(argv) > 0 {
+		switch argv[0] {
+		case "-g", "--global", "-p", "--project":
+			if basedir != "" {
+				CmdHelp(1, "specify only one installation directory option")
+			}
 			basedir = "global"
-		} else if argv[0] == "-p" || argv[0] == "--project" {
-			argv = argv[1:]
-			basedir = "project"
+			if argv[0] == "-p" || argv[0] == "--project" {
+				basedir = "project"
+			}
+		default:
+			break options
 		}
+		argv = argv[1:]
 	}
 	init_global_vars(basedir)
-
+	startupRecovery.command = setupCommand(basedir, true)
+	fmt.Fprintln(os.Stderr, "Checking required directories and current selection...")
+	diagnosis := diagnoseStartup()
 	if len(argv) == 0 || argv[0] == "help" {
+		if !diagnosis.ready() {
+			diagnosis.report(os.Stderr, basedir)
+		}
 		CmdHelp(0)
-	} else if argv[0] != "setup" {
-		checkInitialized()
 	}
+	if argv[0] == "setup" {
+		CmdSetup(diagnosis, argv[1:])
+		return
+	}
+	if !diagnosis.ready() {
+		diagnosis.report(os.Stderr, basedir)
+		ExitCode = 1
+		return
+	}
+	diagnosis.selectCurrent()
 
 	switch argv[0] {
-	case "setup":
-		CmdSetup()
 
 	case "path":
 		CmdPath(argv[1:])
@@ -421,36 +413,8 @@ func EvalSymlink(file string) (string, error) {
 }
 
 func ResolveCurrentDir() {
-	abortf := func(format string, v ...interface{}) {
-		eprintf(format, v...)
-		os.Exit(1)
-	}
-
-	// resolve CurrentDir
-	if dir, err := EvalSymlink(CurrentDir); err != nil {
-		if errors.Is(err, ErrNotSymlink) {
-			abortf("%q is not symlink.\nplease remove it yourself", CurrentDir)
-		} else if !os.IsNotExist(err) {
-			abortf("failed to EvalSymlink(): %#v", err)
-		}
-		os.Remove(CurrentDir)
-	} else if dir != "" {
-		if ok, err := isDir(dir); err != nil {
-			abortf("failed to isDir(): %v", err)
-		} else if !ok {
-			abortf("%s -> %q is not directory.\nplease remove it yourself", CurrentDir, dir)
-		}
-		CurrentUsed = dir
-		LuaRocksCfg.RootDir = filepath.Join(dir, "luarocks")
-
-		// create luarocks directory if not exist
-		if ok, err := isDir(LuaRocksCfg.RootDir); err != nil {
-			abortf("failed to isDir(): %v", err)
-		} else if !ok {
-			if err = mkdir(LuaRocksCfg.RootDir); err != nil {
-				abortf("failed to mkdir: %v", err)
-			}
-		}
+	if err := resolveCurrentDir(); err != nil {
+		fatalf("%v", err)
 	}
 }
 
