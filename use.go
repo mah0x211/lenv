@@ -56,6 +56,9 @@ func UseInstalledVersion(cfg *TargetConfig, ver string) {
 }
 
 func CmdUse(opts []string) {
+	if len(opts) == 0 {
+		CmdHelp(1, "no version specified")
+	}
 	target := PickTargetVersion(opts[0], false)
 	if target.Lua != nil {
 		UseInstalledVersion(target.Lua.Config, target.Lua.Version.Ver)
