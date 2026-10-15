@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -327,6 +326,7 @@ func PickTargetVersion(vers string, exactMatch bool) *TargetVersion {
 func start() {
 	argv := os.Args[1:]
 	basedir := ""
+	startupRecovery.enabled = false
 options:
 	for len(argv) > 0 {
 		switch argv[0] {
@@ -344,6 +344,7 @@ options:
 		argv = argv[1:]
 	}
 	init_global_vars(basedir)
+	startupRecovery.command = setupCommand(basedir, true)
 	fmt.Fprintln(os.Stderr, "Checking required directories and current selection...")
 	diagnosis := diagnoseStartup()
 	if len(argv) == 0 || argv[0] == "help" {
@@ -353,10 +354,7 @@ options:
 		CmdHelp(0)
 	}
 	if argv[0] == "setup" {
-		if !diagnosis.ready() {
-			diagnosis.report(os.Stderr, basedir)
-		}
-		CmdSetup()
+		CmdSetup(diagnosis, argv[1:])
 		return
 	}
 	if !diagnosis.ready() {
@@ -415,36 +413,8 @@ func EvalSymlink(file string) (string, error) {
 }
 
 func ResolveCurrentDir() {
-	abortf := func(format string, v ...interface{}) {
-		eprintf(format, v...)
-		os.Exit(1)
-	}
-
-	// resolve CurrentDir
-	if dir, err := EvalSymlink(CurrentDir); err != nil {
-		if errors.Is(err, ErrNotSymlink) {
-			abortf("%q is not symlink.\nplease remove it yourself", CurrentDir)
-		} else if !os.IsNotExist(err) {
-			abortf("failed to EvalSymlink(): %#v", err)
-		}
-		os.Remove(CurrentDir)
-	} else if dir != "" {
-		if ok, err := isDir(dir); err != nil {
-			abortf("failed to isDir(): %v", err)
-		} else if !ok {
-			abortf("%s -> %q is not directory.\nplease remove it yourself", CurrentDir, dir)
-		}
-		CurrentUsed = dir
-		LuaRocksCfg.RootDir = filepath.Join(dir, "luarocks")
-
-		// create luarocks directory if not exist
-		if ok, err := isDir(LuaRocksCfg.RootDir); err != nil {
-			abortf("failed to isDir(): %v", err)
-		} else if !ok {
-			if err = mkdir(LuaRocksCfg.RootDir); err != nil {
-				abortf("failed to mkdir: %v", err)
-			}
-		}
+	if err := resolveCurrentDir(); err != nil {
+		fatalf("%v", err)
 	}
 }
 

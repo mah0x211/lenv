@@ -164,8 +164,5 @@ func (d *startupDiagnosis) report(output io.Writer, basedir string) {
 		}
 		fmt.Fprintf(output, "Error: Cannot initialize lenv: %s\nPath: %q\nType: %s\n", step.reason, step.path, kind)
 	}
-	if recover {
-		fmt.Fprintln(output, "Move conflicting entries aside before running setup.")
-	}
-	fmt.Fprintf(output, "Run %s to set up this environment.\n", setupCommand(basedir, false))
+	fmt.Fprintf(output, "Run %s to set up or recover this environment.\n", setupCommand(basedir, recover))
 }

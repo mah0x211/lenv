@@ -53,7 +53,7 @@ Options:
 
 Commands:
   help                           Show this message
-  setup                          Set up required files and directories
+  setup [--recover]              Set up directories; optionally confirm recovery
   path <target>                  Show the configured paths
 
   Note:

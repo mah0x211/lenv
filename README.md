@@ -69,7 +69,7 @@ Options:
 
 Commands:
   help                           Show this message
-  setup                          Set up required files and directories
+  setup [--recover]              Set up directories; optionally confirm recovery
   path <target>                  Show the configured paths
 
   Note:
@@ -218,3 +218,48 @@ lenv manages the following directories.
 └── src
     └── <cache>.tar.gz
 ```
+
+### Startup diagnosis and recovery
+
+At startup, lenv diagnoses the management directories and the selected Lua or
+LuaJIT environment without creating or deleting entries. Only actual `.lenv`
+directories are selected during automatic discovery.
+
+If the configuration is incomplete or invalid, only `help` and `setup` can run.
+Other commands stop with the affected path, type, cause, and a suggested setup
+command that preserves the `--global` or `--project` selection. Help remains
+available even when initialization is blocked.
+
+Startup reports the environment check to standard error for every command.
+Setup also reports creation, recovery, and completion stages. Errors are
+prefixed with `Error:` and conflicting entries include recovery guidance.
+
+Run `setup` to create missing management directories and the selected
+environment's `luarocks` directory. This does not install LuaRocks. Pass
+`--recover` to `setup` to enable interactive recovery of conflicting entries:
+
+```sh
+lenv setup
+lenv -p setup --recover
+```
+
+Setup uses the startup diagnosis instead of repeating it. Entries that could
+not yet be diagnosed because required paths need repair are inspected for the
+first time after those paths are ready.
+
+Before deletion, lenv displays the absolute path, entry type, reason, deletion
+scope, and resulting state. Confirmation defaults to cancellation. Removing a
+directory deletes all its contents; removing a symbolic link keeps its target.
+Invalid `current` entries can be removed to leave Lua and LuaJIT unselected.
+Missing targets, non-directory path components, and link loops are recoverable
+structural errors; permission and I/O errors stop further recovery.
+
+After approval, lenv rechecks the entry's identity and type. In-place content
+changes and concurrent replacement after that final check are outside this
+check's guarantee. Cancellation, unavailable terminal input, or recovery failure
+stops setup with an explanation. Completed setup actions are not rolled back if
+a later action fails. Move conflicting entries aside manually if you want to
+preserve them, then rerun setup.
+
+Interactive recovery supports Linux, macOS, and FreeBSD. Its tests require
+Python 3 and the standard-library `pty` module.
