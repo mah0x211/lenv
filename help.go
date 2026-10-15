@@ -11,7 +11,7 @@ func CmdHelp(rc int, msgs ...interface{}) {
 	if len(msgs) > 0 {
 		fmtstr, ok := msgs[0].(string)
 		if !ok {
-			fatalf(errorf("invalid arguments").Error())
+			fatalf("%v", errorf("invalid arguments"))
 		}
 		printf(fmtstr, msgs[1:]...)
 	}
