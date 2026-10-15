@@ -19,4 +19,7 @@ dist/
 # ignore _ prefixed file and directory
 _*
 
+# Ignore hidden files and directories
+.*
+
 dist/

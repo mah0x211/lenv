@@ -94,12 +94,24 @@ Commands:
   fetch                          Fetch remote versions
   vers                           List available versions
   ls                             List installed versions
-  install <version> <opt...>     Install and use a <version> of lua
+  install [--fetch] [--if-missing] <version> <opt...>
+                                 Install and use a <version> of lua
   use <version>                  Use a <version> of lua
   uninstall <version>            Uninstall a <version> of lua
 
   Note:
     The <version> specifier of the above commands can be specified as follows;
+
+    lenv install --fetch 5.5.:latest linux
+                         ; refresh all version lists before selecting versions
+                         ; stop without installing if any refresh fails
+                         ; install options must precede the version
+
+    lenv install --if-missing 5.5.:latest linux
+                         ; reuse and select existing version directories
+                         ; check Lua and LuaRocks independently
+                         ; directory existence is checked, not binary validity
+                         ; can be combined with --fetch
 
     lenv install latest  ; that picks the latest version
     lenv install 5       ; that picks the latest minor version and patch version
