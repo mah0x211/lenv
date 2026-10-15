@@ -11,7 +11,7 @@ import (
 
 func listRocks(luadir string) {
 	if err := os.Chdir(luadir); err != nil {
-		eprintf(err.Error())
+		eprintf("%v", err)
 		return
 	}
 

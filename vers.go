@@ -340,7 +340,7 @@ func CmdVers() {
 	for _, cfg := range []*TargetConfig{
 		LuaCfg, LuaJitCfg, LuaRocksCfg,
 	} {
-		print(ListTargetVersions(cfg))
+		print("%s", ListTargetVersions(cfg))
 		print("\n")
 	}
 }
