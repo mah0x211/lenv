@@ -170,48 +170,89 @@ func postInstallLuaJit(instdir string) error {
 	return nil
 }
 
-func untarGz(dir string, data io.Reader) (string, error) {
+// archivePath checks the actual extraction tree as well as the entry name.
+// The tree is private to this extraction attempt; archive-created symlinks must
+// never be followed, including when an entry replaces an existing leaf.
+func archivePath(dir, name string) (string, error) {
+	if !filepath.IsLocal(name) {
+		return "", fmt.Errorf("archive entry %q is not a local path", name)
+	}
+
+	clean := filepath.Clean(name)
+	dest := filepath.Join(dir, clean)
+	current := dir
+	for _, part := range strings.Split(clean, string(filepath.Separator)) {
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if os.IsNotExist(err) {
+			return dest, nil
+		} else if err != nil {
+			return "", fmt.Errorf("archive entry %q: %w", name, err)
+		} else if info.Mode()&os.ModeSymlink != 0 {
+			return "", fmt.Errorf("archive entry %q uses symlink %q", name, current)
+		} else if current != dest && !info.IsDir() {
+			return "", fmt.Errorf("archive entry %q uses non-directory %q", name, current)
+		}
+	}
+	return dest, nil
+}
+
+func untarGz(dir string, data io.Reader) (rootdir string, err error) {
 	gz, err := gzip.NewReader(data)
 	if err != nil {
 		return "", err
 	}
+	defer gz.Close()
 
-	rootdir := dir
+	// A failed cached extraction must not contaminate a subsequent download.
+	dir, err = os.MkdirTemp(dir, "extract-")
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if err != nil {
+			if cleanupErr := os.RemoveAll(dir); cleanupErr != nil {
+				err = fmt.Errorf("%w; failed to remove extraction directory %q: %v", err, dir, cleanupErr)
+			}
+		}
+	}()
+
+	rootdir = dir
 	checked := false
 	r := tar.NewReader(gz)
 	for {
-		h, err := r.Next()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
+		h, readErr := r.Next()
+		if readErr != nil {
+			if errors.Is(readErr, io.EOF) {
 				break
 			}
-			return "", err
+			return "", readErr
 		}
 
+		dest, pathErr := archivePath(dir, h.Name)
+		if pathErr != nil {
+			return "", pathErr
+		}
 		println(h.Name)
 		switch h.Typeflag {
 		case tar.TypeReg, tar.TypeRegA:
-			if !checked {
-				checked = true
-			}
-			err = writeFile(filepath.Join(dir, h.Name), h.FileInfo().Mode().Perm(), r)
+			err = writeFile(dest, h.FileInfo().Mode().Perm(), r)
 		case tar.TypeSymlink:
-			if !checked {
-				checked = true
+			if err = mkdir(filepath.Dir(dest)); err == nil {
+				err = os.Symlink(h.Linkname, dest)
 			}
-			err = createSymlink(h.Linkname, filepath.Join(dir, h.Name))
 		case tar.TypeDir:
 			if !checked {
-				checked = true
-				rootdir = filepath.Join(dir, h.Name)
+				rootdir = dest
 			}
-			err = mkdir(filepath.Join(dir, h.Name))
+			err = mkdir(dest)
 		default:
-			err = fmt.Errorf("unknown type flag %v of %q", h.Typeflag, h.Name)
+			err = fmt.Errorf("unknown type flag %v", h.Typeflag)
 		}
+		checked = true
 
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("archive entry %q: %w", h.Name, err)
 		}
 	}
 	return rootdir, nil
