@@ -49,7 +49,9 @@ func CmdUninstall(opts []string) {
 		if pathname, err := EvalSymlink(symlink); err != nil && !errors.Is(err, ErrNotSymlink) && !os.IsNotExist(err) {
 			fatalf("failed to EvalSymlink(): %#v", err)
 		} else {
-			shouldRemoveSymlink = strings.HasPrefix(pathname, rocksdir)
+			// A version-name prefix alone also matches sibling versions.
+			shouldRemoveSymlink = pathname == rocksdir ||
+				strings.HasPrefix(pathname, rocksdir+string(filepath.Separator))
 		}
 
 		uninstall(target.LuaRocks)
