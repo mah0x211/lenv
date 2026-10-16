@@ -112,6 +112,11 @@ func getPath() string {
 	}, ":")
 }
 
+// Single quotes suppress shell expansion; emit embedded quotes separately.
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
+}
+
 func printAll() {
 	rockspath := GetLuaPackagePaths()
 
@@ -124,15 +129,15 @@ func printAll() {
 		var value string
 		switch name {
 		case "PATH":
-			value = getPath() + ":$PATH"
+			value = shellQuote(getPath()) + `:"$PATH"`
 
 		case "LUA_PATH":
-			value = getLuaPath(rockspath)
+			value = shellQuote(getLuaPath(rockspath))
 
 		case "LUA_CPATH":
-			value = getLuaCPath(rockspath)
+			value = shellQuote(getLuaCPath(rockspath))
 		}
-		printf(`export %s="%s"`, name, value)
+		printf(`export %s=%s`, name, value)
 	}
 	println("")
 }
