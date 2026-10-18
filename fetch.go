@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
+	"net/url"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -35,43 +37,62 @@ func parseLuaRocksVers(v interface{}) *Versions {
 	return vers
 }
 
-func parseLuaJitVers(v interface{}) *Versions {
-	repodir := v.(string)
-	err := os.Chdir(repodir)
+// Fetch all pages before publishing the list, so a failed page keeps the old list.
+func fetchLuaJitVers(releaseURL string) (*Versions, error) {
+	u, err := url.Parse(releaseURL)
 	if err != nil {
-		eprintf("failed to chdir: %v", err)
-		return nil
+		return nil, err
 	}
-	defer os.Chdir(CWD)
-
-	// get list of remote branches
-	out := &bytes.Buffer{}
-	err = DoExecEx("git", out, os.Stderr, "branch", "-r")
-	if err != nil {
-		eprintf("failed to get branches: %v", err)
-		return nil
-	}
-
-	// parse branches
 	vers := NewVersions()
-	for _, line := range strings.Split(out.String(), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.Contains(line, " ") {
-			// ignore unsupported branch
-			continue
+	for page := 1; ; page++ {
+		query := u.Query()
+		query.Set("per_page", "100")
+		query.Set("page", strconv.Itoa(page))
+		u.RawQuery = query.Encode()
+		req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+		if err != nil {
+			return nil, err
 		}
-
-		// split line to remote and branch
-		// e.g. origin/HEAD -> "origin", "master"
-		origin := strings.Split(line, "/")
-		if len(origin) != 2 {
-			// ignore unsupported branch
-			continue
+		req.Header.Set("Accept", "application/vnd.github+json")
+		req.Header.Set("X-GitHub-Api-Version", "2026-03-10")
+		rsp, err := httpsRequest(req)
+		if err != nil {
+			return nil, err
 		}
-		vers.AddBranch(origin[1], origin[0])
+		if rsp.StatusCode != http.StatusOK {
+			rsp.Body.Close()
+			if rsp.Header.Get("X-RateLimit-Remaining") == "0" {
+				return nil, fmt.Errorf("GitHub API rate limit exceeded for %q; retry later", releaseURL)
+			}
+			return nil, fmt.Errorf("failed to get %q: %s", u.String(), rsp.Status)
+		}
+		body, err := io.ReadAll(rsp.Body)
+		rsp.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read GitHub branches: %w", err)
+		}
+		var branches []struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(body, &branches); err != nil {
+			return nil, fmt.Errorf("invalid GitHub branch list: %w", err)
+		}
+		for _, branch := range branches {
+			if branch.Name == "" {
+				return nil, fmt.Errorf("GitHub branch list contains an empty name")
+			}
+			// Keep the existing single-component branch/version naming contract.
+			if branch.Name == "." || !filepath.IsLocal(branch.Name) ||
+				strings.ContainsAny(branch.Name, "/\\ \t\r\n") {
+				continue
+			}
+			// Retain the legacy branch discriminator in saved version lists.
+			vers.AddBranch(branch.Name, "origin")
+		}
+		if len(branches) < 100 {
+			return vers, nil
+		}
 	}
-
-	return vers
 }
 
 func parseLuaVers(v interface{}) *Versions {
@@ -96,13 +117,8 @@ func makeVerFile(cfg *TargetConfig, vers *Versions) bool {
 
 	items, maxlen := vers.GetList()
 	for _, item := range items {
-		if cfg.RepoDir != "" {
-			format := fmt.Sprintf("%%-%ds    %%s/%%s %%s", maxlen)
-			printf(format, item.Name, item.Remote, item.Name, cfg.ReleaseURL)
-			continue
-		}
 		format := fmt.Sprintf("%%-%ds    %%s", maxlen)
-		url := cfg.DownloadURL + filepath.Clean(item.Name)
+		url := sourceURL(cfg, item)
 		printf(format, item.Ver, url)
 	}
 	return true
@@ -115,7 +131,7 @@ func CmdFetch() bool {
 		parse ParseFunc
 	}{
 		{LuaCfg, parseLuaVers},
-		{LuaJitCfg, parseLuaJitVers},
+		{LuaJitCfg, nil},
 		{LuaRocksCfg, parseLuaRocksVers},
 	} {
 		printf(
@@ -125,58 +141,22 @@ func CmdFetch() bool {
 
 		var vers *Versions
 
-		if target.cfg.RepoDir != "" {
-			// make temp dir
-			tmpdir, err := os.MkdirTemp(os.TempDir(), "lenv-")
+		if target.cfg.Name == "luajit" {
+			var err error
+			vers, err = fetchLuaJitVers(target.cfg.ReleaseURL)
 			if err != nil {
-				eprintf("failed to create temp dir: %v\n", err)
+				eprintf("failed to fetch LuaJIT versions: %v", err)
 				success = false
 				continue
 			}
-			defer os.RemoveAll(tmpdir)
-
-			// shallow clone with all branches
-			err = DoExec("git", "clone", "--depth", "1", "--no-single-branch", target.cfg.ReleaseURL, tmpdir)
-			if err != nil {
-				eprintf("failed to clone %q: %v\n", target.cfg.ReleaseURL, err)
-				success = false
-				continue
-			}
-			if err := os.RemoveAll(target.cfg.RepoDir); err != nil {
-				eprintf("failed to remove repository: %v", err)
-				success = false
-				continue
-			}
-			if err = Copy(tmpdir, target.cfg.RepoDir); err != nil {
-				eprintf("failed to rename %q to %q: %v\n", tmpdir, target.cfg.RepoDir, err)
-				success = false
-				continue
-			}
-			vers = target.parse(target.cfg.RepoDir)
-
 		} else {
-			rsp, err := http.Get(target.cfg.ReleaseURL)
+			body, err := readDownload(target.cfg.ReleaseURL)
 			if err != nil {
-				eprintf("failed to download %q: %v\n", target.cfg.ReleaseURL, err)
+				eprintf("failed to download %q: %v", target.cfg.ReleaseURL, err)
 				success = false
 				continue
 			}
-			defer rsp.Body.Close()
-
-			// check status code
-			if rsp.StatusCode != http.StatusOK {
-				eprintf("failed to download %q: %s\n", target.cfg.ReleaseURL, rsp.Status)
-				success = false
-				continue
-			}
-
-			b, err := io.ReadAll(rsp.Body)
-			if err != nil {
-				eprintf("failed to read body: %v\n", err)
-				success = false
-				continue
-			}
-			vers = target.parse(b)
+			vers = target.parse(body)
 		}
 
 		if vers == nil || len(vers.dict) == 0 {

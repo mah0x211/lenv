@@ -81,7 +81,7 @@ func TestIfMissingUsesExistingLuaAndLuaJitDirectories(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, "keep", string(data))
 			require.Zero(t, atomic.LoadInt32(&fixture.requests))
-			_, err = os.Stat(LuaJitCfg.RepoDir)
+			_, err = os.Stat(filepath.Join(SrcDir, "luajit"))
 			require.True(t, os.IsNotExist(err))
 		})
 	}
@@ -199,7 +199,7 @@ func TestFetchAndIfMissingTogether(t *testing.T) {
 	require.NoError(t, os.Mkdir(filepath.Join(rocks, "lua_modules"), 0755))
 	require.True(t, runInstallForTest("--fetch", "--if-missing", "5.5.:latest", "linux"))
 	require.Zero(t, ExitCode)
-	require.Equal(t, int32(2), atomic.LoadInt32(&fixture.requests))
+	require.Equal(t, int32(3), atomic.LoadInt32(&fixture.requests))
 	require.Zero(t, atomic.LoadInt32(&fixture.downloads))
 	require.Equal(t, lua, CurrentUsed)
 }

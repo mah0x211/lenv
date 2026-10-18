@@ -11,12 +11,12 @@ import (
 )
 
 type TargetConfig struct {
-	Name        string
-	RepoDir     string
-	RootDir     string
-	VersionFile string
-	ReleaseURL  string
-	DownloadURL string
+	Name          string
+	RootDir       string
+	VersionFile   string
+	ReleaseURL    string
+	DownloadURL   string
+	SigningKeyURL string
 }
 
 var (
@@ -30,21 +30,22 @@ var (
 		Name:        "lua",
 		RootDir:     filepath.Join(LenvDir, "lua"),
 		VersionFile: filepath.Join(LenvDir, "lua_vers.txt"),
-		ReleaseURL:  "http://lua.org/ftp/",
-		DownloadURL: "http://lua.org/ftp/",
+		ReleaseURL:  "https://www.lua.org/ftp/",
+		DownloadURL: "https://www.lua.org/ftp/",
 	}
 	LuaJitCfg = &TargetConfig{
 		Name:        "luajit",
-		RepoDir:     filepath.Join(SrcDir, "luajit"),
 		RootDir:     filepath.Join(LenvDir, "luajit"),
 		VersionFile: filepath.Join(LenvDir, "luajit_vers.txt"),
-		ReleaseURL:  "https://github.com/LuaJIT/LuaJIT.git",
+		ReleaseURL:  "https://api.github.com/repos/LuaJIT/LuaJIT/branches",
+		DownloadURL: "https://github.com/LuaJIT/LuaJIT/archive/refs/heads/",
 	}
 	LuaRocksCfg = &TargetConfig{
-		Name:        "luarocks",
-		VersionFile: filepath.Join(LenvDir, "luarocks_vers.txt"),
-		ReleaseURL:  "http://luarocks.github.io/luarocks/releases/",
-		DownloadURL: "http://luarocks.github.io/luarocks/releases/",
+		Name:          "luarocks",
+		VersionFile:   filepath.Join(LenvDir, "luarocks_vers.txt"),
+		ReleaseURL:    "https://luarocks.github.io/luarocks/releases/",
+		DownloadURL:   "https://luarocks.github.io/luarocks/releases/",
+		SigningKeyURL: "https://github.com/hishamhm.gpg",
 	}
 )
 
@@ -100,7 +101,6 @@ func init_global_vars(basedir string) {
 
 	LuaCfg.RootDir = filepath.Join(LenvDir, "lua")
 	LuaCfg.VersionFile = filepath.Join(LenvDir, "lua_vers.txt")
-	LuaJitCfg.RepoDir = filepath.Join(SrcDir, "luajit")
 	LuaJitCfg.RootDir = filepath.Join(LenvDir, "luajit")
 	LuaJitCfg.VersionFile = filepath.Join(LenvDir, "luajit_vers.txt")
 	LuaRocksCfg.VersionFile = filepath.Join(LenvDir, "luarocks_vers.txt")
