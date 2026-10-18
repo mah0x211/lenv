@@ -258,6 +258,9 @@ func (vers *Versions) PickItem(ver string) *VerItem {
 
 	// pick a latest version
 	if ver == "latest" {
+		if len(items) == 0 {
+			return nil
+		}
 		return items[0]
 	}
 
