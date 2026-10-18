@@ -370,7 +370,9 @@ options:
 		CmdPath(argv[1:])
 
 	case "fetch":
-		CmdFetch()
+		if !CmdFetch() {
+			ExitCode = 1
+		}
 
 	case "vers":
 		CmdVers()
