@@ -78,7 +78,7 @@ Commands:
   fetch                          Fetch remote versions
   vers                           List available versions
   ls                             List installed versions
-  install [--fetch] [--if-missing] <version> <opt...>
+  install [--fetch] [--if-missing] [--allow-missing-gpg] <version> <opt...>
                                  Install and use a <version> of lua
   use <version>                  Use a <version> of lua
   uninstall <version>            Uninstall a <version> of lua
@@ -96,6 +96,10 @@ Commands:
                          ; check Lua and LuaRocks independently
                          ; directory existence is checked, not binary validity
                          ; can be combined with --fetch
+
+    lenv install --allow-missing-gpg :latest
+                         ; warn and install without PGP verification only if gpg, gpg2 and gpgv are absent
+                         ; signature verification errors still stop when a verifier is available
 
     lenv install latest  ; that picks the latest version
     lenv install 5       ; that picks the latest minor version and patch version

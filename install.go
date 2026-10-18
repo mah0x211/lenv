@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -224,9 +224,17 @@ func untarGz(dir string, data io.Reader) (rootdir string, err error) {
 		h, readErr := r.Next()
 		if readErr != nil {
 			if errors.Is(readErr, io.EOF) {
+				if _, err := io.Copy(io.Discard, gz); err != nil {
+					return "", fmt.Errorf("invalid gzip trailer: %w", err)
+				}
 				break
 			}
 			return "", readErr
+		}
+
+		// Global PAX headers describe metadata, not filesystem entries.
+		if h.Typeflag == tar.TypeXGlobalHeader {
+			continue
 		}
 
 		dest, pathErr := archivePath(dir, h.Name)
@@ -297,11 +305,6 @@ func installLuaJit(instdir string, opts []string) error {
 		}
 	}
 
-	// clean up working directory
-	if err := DoExec("make", append([]string{"clean"}, opts...)...); err != nil {
-		return err
-	}
-
 	printf("make %s", strings.Join(opts, " "))
 	if err := DoExec("make", opts...); err != nil {
 		return err
@@ -309,13 +312,6 @@ func installLuaJit(instdir string, opts []string) error {
 
 	printf("make install PREFIX=%s", instdir)
 	if err := DoExec("make", "install", "PREFIX="+instdir); err != nil {
-		return err
-	}
-
-	// clean up working directory
-	if err := DoExec("make", append([]string{"clean"}, opts...)...); err != nil {
-		return err
-	} else if err := DoExec("git", "checkout", "."); err != nil {
 		return err
 	}
 
@@ -333,92 +329,101 @@ func installLua(instdir string, opts []string) error {
 	return DoExec("make", "install", "INSTALL_TOP="+instdir)
 }
 
-func openCachedFile(url string) (io.Reader, error) {
+func openCachedFile(url string) ([]byte, error) {
 	file := filepath.Join(SrcDir, filepath.Base(url))
-	// open cached file if exists
-	if f, err := openFile(file); err != nil {
+	f, err := openFile(file)
+	if err != nil || f == nil {
 		return nil, err
-	} else if f != nil {
-		defer f.Close()
-		b, err := io.ReadAll(f)
-		if err != nil {
-			return nil, err
-		}
-		return bytes.NewReader(b), nil
 	}
-	return nil, nil
+	defer f.Close()
+	return io.ReadAll(f)
 }
 
-func extractCachedFile(tmpdir, url string) (string, error) {
+func extractCachedFile(tmpdir, url string, cfg *TargetConfig, item *VerItem, skipPGP bool) (string, error) {
 	data, err := openCachedFile(url)
 	if err != nil {
 		return "", fmt.Errorf("open cached file error: %w", err)
 	} else if data == nil {
 		return "", nil
-	} else if dir, err := untarGz(tmpdir, data); err != nil {
-		return "", fmt.Errorf("uncompress the cached file error: %w", err)
-	} else {
-		return dir, nil
+
 	}
+	var signature []byte
+	if cfg.Name == "luarocks" && !skipPGP {
+		signature, err = os.ReadFile(filepath.Join(SrcDir, filepath.Base(url)) + ".asc")
+		if err != nil {
+			return "", fmt.Errorf("read cached signature: %w", err)
+		}
+	}
+	if cfg.Name != "luarocks" || !skipPGP {
+		if err := verifyArchive(cfg, item, data, signature); err != nil {
+			return "", err
+		}
+	}
+	return untarGz(tmpdir, bytes.NewReader(data))
 }
 
-func download(url string) (io.Reader, error) {
-	file := filepath.Join(SrcDir, filepath.Base(url))
-
-	// download from url
-	rsp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	} else if rsp.StatusCode != 200 {
-		return nil, fmt.Errorf("failed to get %q: %s", url, rsp.Status)
+// Publish a complete archive without truncating the previous download.
+func saveDownloadedArchive(file string, data []byte) error {
+	if err := mkdir(filepath.Dir(file)); err != nil {
+		return err
 	}
-	defer rsp.Body.Close()
-
-	// create cache file
-	f, err := createFile(file, 0)
+	f, err := os.CreateTemp(filepath.Dir(file), ".lenv-download-*")
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defer f.Close()
-
-	b, err := io.ReadAll(rsp.Body)
-	if err != nil {
-		os.Remove(file)
-		return nil, err
-	} else if _, err = f.Write(b); err != nil {
-		os.Remove(file)
-		return nil, err
+	defer func() {
+		f.Close()
+		os.Remove(f.Name())
+	}()
+	if _, err := f.Write(data); err != nil {
+		return err
 	}
-
-	return bytes.NewReader(b), nil
+	if err := f.Sync(); err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(f.Name(), file)
 }
 
-func extractDownloadedFile(tmpdir, url string) (string, error) {
-	data, err := download(url)
+func extractDownloadedFile(tmpdir, url string, cfg *TargetConfig, item *VerItem, skipPGP bool) (string, error) {
+	data, err := readDownload(url)
 	if err != nil {
 		return "", fmt.Errorf("download error: %w", err)
-	} else if dir, err := untarGz(tmpdir, data); err != nil {
-		return "", fmt.Errorf("uncompress the downloadeded file error: %w", err)
-	} else {
-		return dir, nil
 	}
+	var signature []byte
+	if cfg.Name == "luarocks" && !skipPGP {
+		signature, err = readDownload(url + ".asc")
+		if err != nil {
+			return "", fmt.Errorf("signature download error: %w", err)
+		}
+	}
+	if cfg.Name != "luarocks" || !skipPGP {
+		if err := verifyArchive(cfg, item, data, signature); err != nil {
+			return "", err
+		}
+	}
+	file := filepath.Join(SrcDir, filepath.Base(url))
+	if err := saveDownloadedArchive(file, data); err != nil {
+		return "", err
+	}
+	if cfg.Name == "luarocks" && !skipPGP {
+		if err := saveDownloadedArchive(file+".asc", signature); err != nil {
+			return "", err
+		}
+	}
+	return untarGz(tmpdir, bytes.NewReader(data))
 }
 
-func switchBranch(repodir, remote, branch string) error {
-	if err := os.Chdir(repodir); err != nil {
-		fatalf("failed to chdir(): %v", err)
+func sourceURL(cfg *TargetConfig, item *VerItem) string {
+	if cfg.Name == "luajit" {
+		return cfg.DownloadURL + url.PathEscape(item.Name) + ".tar.gz"
 	}
-	defer os.Chdir(CWD)
-
-	if err := DoExec("git", "fetch", "--depth", "1", remote, branch); err != nil {
-		return err
-	} else if err = DoExec("git", "checkout", branch); err != nil {
-		return err
-	}
-	return DoExec("git", "checkout", ".")
+	return cfg.DownloadURL + filepath.Clean(item.Name)
 }
 
-func doInstall(cfg *TargetConfig, item *VerItem, opts []string, ifMissing bool) {
+func doInstall(cfg *TargetConfig, item *VerItem, opts []string, ifMissing, allowMissingGPG bool) {
 	instdir := filepath.Join(cfg.RootDir, item.Ver)
 	if ifMissing {
 		installed, err := isDir(instdir)
@@ -431,32 +436,41 @@ func doInstall(cfg *TargetConfig, item *VerItem, opts []string, ifMissing bool) 
 			return
 		}
 	}
+	skipPGP := false
+	if cfg.Name == "luarocks" {
+		if _, err := findGPG(); err != nil {
+			if !errors.Is(err, errGPGNotFound) {
+				fatalf("%v", err)
+			}
+			if !allowMissingGPG {
+				fatalf("%v; use --allow-missing-gpg to proceed without signature verification", errGPGNotFound)
+			}
+			eprintf("Warning: no PGP verification command was found; LuaRocks PGP signature verification is disabled for this installation.")
+			skipPGP = true
+		}
+	}
 	printf("install %q", item.Ver)
 
-	var dir string
-	if cfg.RepoDir != "" {
-		dir = cfg.RepoDir
-		if err := switchBranch(dir, item.Remote, item.Name); err != nil {
-			fatalf("failed to git checkout %s/%s: %v", item.Remote, item.Name, err)
-		}
-	} else {
-		url := cfg.DownloadURL + filepath.Clean(item.Name)
-		tmpdir, err := os.MkdirTemp(os.TempDir(), "lenv_tmp_")
-		if err != nil {
-			fatalf("failed to create tempdir: %v", err)
-		}
-		defer os.RemoveAll(tmpdir)
+	url := sourceURL(cfg, item)
+	tmpdir, err := os.MkdirTemp(os.TempDir(), "lenv_tmp_")
+	if err != nil {
+		fatalf("failed to create tempdir: %v", err)
+	}
+	defer os.RemoveAll(tmpdir)
 
-		dir, err = extractCachedFile(tmpdir, url)
-		if dir != "" {
-			println("use cached file")
-		} else {
-			if err != nil {
-				printf("failed to extract cached file: %v", err)
-			}
-			if dir, err = extractDownloadedFile(tmpdir, url); err != nil {
-				fatalf("failed to extract downloaded file: %v", err)
-			}
+	var dir string
+	// Branch archives are mutable; always download the current LuaJIT source.
+	if cfg.Name != "luajit" {
+		dir, err = extractCachedFile(tmpdir, url, cfg, item, skipPGP)
+	}
+	if dir != "" {
+		println("use cached file")
+	} else {
+		if err != nil {
+			printf("failed to extract cached file: %v", err)
+		}
+		if dir, err = extractDownloadedFile(tmpdir, url, cfg, item, skipPGP); err != nil {
+			fatalf("failed to extract downloaded file: %v", err)
 		}
 	}
 
@@ -470,7 +484,6 @@ func doInstall(cfg *TargetConfig, item *VerItem, opts []string, ifMissing bool) 
 		fatalf("failed to chdir(): %v", err)
 	}
 
-	var err error
 	switch cfg.Name {
 	case "lua":
 		err = installLua(instdir, opts)
@@ -492,10 +505,11 @@ func doInstall(cfg *TargetConfig, item *VerItem, opts []string, ifMissing bool) 
 }
 
 type installOptions struct {
-	fetch     bool
-	ifMissing bool
-	version   string
-	build     []string
+	fetch           bool
+	ifMissing       bool
+	allowMissingGPG bool
+	version         string
+	build           []string
 }
 
 func parseInstallOptions(args []string) (*installOptions, error) {
@@ -506,6 +520,8 @@ func parseInstallOptions(args []string) (*installOptions, error) {
 			options.fetch = true
 		case "--if-missing":
 			options.ifMissing = true
+		case "--allow-missing-gpg":
+			options.allowMissingGPG = true
 		default:
 			return nil, fmt.Errorf("unknown install option %q", args[0])
 		}
@@ -534,11 +550,11 @@ func prepareInstall(args []string) (*TargetVersion, *installOptions) {
 func CmdInstall(opts []string) {
 	target, options := prepareInstall(opts)
 	if target.Lua != nil {
-		doInstall(target.Lua.Config, target.Lua.Version, options.build, options.ifMissing)
+		doInstall(target.Lua.Config, target.Lua.Version, options.build, options.ifMissing, options.allowMissingGPG)
 	}
 	if target.LuaRocks != nil {
 		ResolveCurrentDir()
 		CheckLuaRocksRootDir()
-		doInstall(target.LuaRocks.Config, target.LuaRocks.Version, options.build, options.ifMissing)
+		doInstall(target.LuaRocks.Config, target.LuaRocks.Version, options.build, options.ifMissing, options.allowMissingGPG)
 	}
 }

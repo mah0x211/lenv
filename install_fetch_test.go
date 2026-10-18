@@ -3,9 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -59,7 +57,7 @@ func newInstallFetchFixture(t *testing.T, failure string) *installFetchFixture {
 	dir, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
 	fixture := &installFetchFixture{dir: dir}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newDownloadTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&fixture.requests, 1)
 		switch r.URL.Path {
 		case "/lua":
@@ -82,6 +80,12 @@ func newInstallFetchFixture(t *testing.T, failure string) *installFetchFixture {
 				return
 			}
 			fmt.Fprintf(w, "<tr><td class=\"name\"><a href=\"lua-5.5.1.tar.gz\">lua</a></td><td class=\"sum\">%s</td></tr>", strings.Repeat("a", 64))
+		case "/jit":
+			if failure == "branches" {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+			fmt.Fprint(w, `[{"name":"v2.1"},{"name":"main"}]`)
 		case "/rocks":
 			fmt.Fprint(w, `<a href="luarocks-3.13.0.tar.gz">archive</a><a href="luarocks-3.13.0.tar.gz.asc">signature</a>`)
 		default:
@@ -90,22 +94,8 @@ func newInstallFetchFixture(t *testing.T, failure string) *installFetchFixture {
 		}
 	}))
 	t.Cleanup(server.Close)
-	remote := filepath.Join(fixture.dir, "remote")
-	require.NoError(t, os.Mkdir(remote, 0755))
-	git := func(args ...string) {
-		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", remote}, args...)...)
-		out, err := cmd.CombinedOutput()
-		require.NoError(t, err, "%s", out)
-	}
-	git("init")
-	git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "fixture")
-	git("branch", "v2.1")
 	if failure == "connection" {
 		server.Close()
-	}
-	if failure == "clone" {
-		remote = filepath.Join(fixture.dir, "missing-repository")
 	}
 	oldLua, oldJit, oldRocks := LuaCfg, LuaJitCfg, LuaRocksCfg
 	oldCWD, oldLenv, oldSrc, oldCurrent, oldUsed, oldExit := CWD, LenvDir, SrcDir, CurrentDir, CurrentUsed, ExitCode
@@ -123,8 +113,8 @@ func newInstallFetchFixture(t *testing.T, failure string) *installFetchFixture {
 	ExitCode = 0
 	require.NoError(t, os.MkdirAll(SrcDir, 0755))
 	LuaCfg = &TargetConfig{Name: "lua", RootDir: filepath.Join(fixture.dir, "lua"), VersionFile: filepath.Join(fixture.dir, "lua.json"), ReleaseURL: server.URL + "/lua", DownloadURL: server.URL + "/download/"}
-	LuaJitCfg = &TargetConfig{Name: "luajit", RootDir: filepath.Join(fixture.dir, "luajit"), RepoDir: filepath.Join(SrcDir, "luajit"), VersionFile: filepath.Join(fixture.dir, "jit.json"), ReleaseURL: "file://" + remote}
-	LuaRocksCfg = &TargetConfig{Name: "luarocks", VersionFile: filepath.Join(fixture.dir, "rocks.json"), ReleaseURL: server.URL + "/rocks", DownloadURL: server.URL + "/download/"}
+	LuaJitCfg = &TargetConfig{Name: "luajit", RootDir: filepath.Join(fixture.dir, "luajit"), VersionFile: filepath.Join(fixture.dir, "jit.json"), ReleaseURL: server.URL + "/jit", DownloadURL: server.URL + "/jit-download/"}
+	LuaRocksCfg = &TargetConfig{Name: "luarocks", SigningKeyURL: publisherKeyURL(t), VersionFile: filepath.Join(fixture.dir, "rocks.json"), ReleaseURL: server.URL + "/rocks", DownloadURL: server.URL + "/download/"}
 	old := NewVersions()
 	old.Add("lua-5.4.8.tar.gz", "5.4.8", "sha256:"+strings.Repeat("b", 64), ".tar.gz")
 	require.NoError(t, old.WriteFile(LuaCfg.VersionFile))
@@ -147,7 +137,7 @@ func TestPrepareInstallFetchBeforeVersionSelection(t *testing.T) {
 	require.Equal(t, "5.5.1", target.Lua.Version.Ver)
 	require.Equal(t, "3.13.0", target.LuaRocks.Version.Ver)
 	require.Equal(t, []string{"linux"}, options.build)
-	require.Equal(t, int32(2), atomic.LoadInt32(&fixture.requests))
+	require.Equal(t, int32(3), atomic.LoadInt32(&fixture.requests))
 	require.Zero(t, atomic.LoadInt32(&fixture.downloads))
 	jit, err := NewVersionsFromFile(LuaJitCfg.VersionFile)
 	require.NoError(t, err)
@@ -164,7 +154,7 @@ func TestPrepareInstallWithoutFetchUsesCachedList(t *testing.T) {
 }
 
 func TestInstallFetchFailureStopsBeforeInstalling(t *testing.T) {
-	for _, failure := range []string{"http", "empty", "save", "connection", "read", "clone"} {
+	for _, failure := range []string{"http", "empty", "save", "connection", "read", "branches"} {
 		t.Run(failure, func(t *testing.T) {
 			fixture := newInstallFetchFixture(t, failure)
 			before, err := os.Readlink(CurrentDir)

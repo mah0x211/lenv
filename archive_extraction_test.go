@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,6 +15,7 @@ import (
 type archiveEntry struct {
 	name, body, link string
 	kind             byte
+	pax              map[string]string
 }
 
 func archiveData(t *testing.T, entries ...archiveEntry) []byte {
@@ -24,7 +24,10 @@ func archiveData(t *testing.T, entries ...archiveEntry) []byte {
 	gz := gzip.NewWriter(&buf)
 	tw := tar.NewWriter(gz)
 	for _, entry := range entries {
-		h := &tar.Header{Name: entry.name, Typeflag: entry.kind, Mode: 0755, Linkname: entry.link}
+		h := &tar.Header{Name: entry.name, Typeflag: entry.kind, Mode: 0755, Linkname: entry.link, PAXRecords: entry.pax}
+		if entry.kind == tar.TypeXGlobalHeader {
+			h.Mode = 0
+		}
 		if entry.kind == tar.TypeReg || entry.kind == tar.TypeRegA {
 			h.Size = int64(len(entry.body))
 		}
@@ -227,7 +230,7 @@ func TestArchiveExtractionCacheRetryIsIsolated(t *testing.T) {
 		archiveEntry{name: "pkg/", kind: tar.TypeDir},
 		archiveEntry{name: "pkg/link/file", kind: tar.TypeReg, body: "downloaded"})
 	requests := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newDownloadTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
 		_, _ = w.Write(valid)
 	}))
@@ -240,7 +243,9 @@ func TestArchiveExtractionCacheRetryIsIsolated(t *testing.T) {
 	if err := os.WriteFile(cache, bad, 0600); err != nil {
 		t.Fatal(err)
 	}
-	if root, err := extractCachedFile(parent, url); err == nil || root != "" {
+	cfg := &TargetConfig{Name: "lua"}
+	item := &VerItem{Name: "source.tar.gz", Sum: archiveSHA256(bad)}
+	if root, err := extractCachedFile(parent, url, cfg, item, false); err == nil || root != "" {
 		t.Fatalf("cached extraction = %q, %v; want failure", root, err)
 	}
 	assertEmptyExtraction(t, parent)
@@ -248,7 +253,8 @@ func TestArchiveExtractionCacheRetryIsIsolated(t *testing.T) {
 	if requests != 0 {
 		t.Fatal("cached extraction unexpectedly downloaded")
 	}
-	root, err := extractDownloadedFile(parent, url)
+	item.Sum = archiveSHA256(valid)
+	root, err := extractDownloadedFile(parent, url, cfg, item, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +264,7 @@ func TestArchiveExtractionCacheRetryIsIsolated(t *testing.T) {
 		t.Fatalf("download requests = %d; want 1", requests)
 	}
 	// A successful cached attempt must also get a separate extraction tree.
-	cachedRoot, err := extractCachedFile(parent, url)
+	cachedRoot, err := extractCachedFile(parent, url, cfg, item, false)
 	if err != nil || cachedRoot == root {
 		t.Fatalf("cached retry root = %q, error = %v", cachedRoot, err)
 	}
@@ -309,4 +315,35 @@ func TestArchiveExtractionCaseAlias(t *testing.T) {
 		assertEmptyExtraction(t, parent)
 	}
 	assertArchiveFile(t, sentinel, "preserved")
+}
+
+func TestArchiveExtractionGlobalPAXMetadata(t *testing.T) {
+	for _, name := range []string{"pkg/file", "../outside"} {
+		t.Run(name, func(t *testing.T) {
+			parent := t.TempDir()
+			data := archiveData(t,
+				archiveEntry{name: "pax_global_header", kind: tar.TypeXGlobalHeader, pax: map[string]string{"comment": "archive revision"}},
+				archiveEntry{name: "pkg/", kind: tar.TypeDir},
+				archiveEntry{name: name, kind: tar.TypeReg, body: "content"},
+			)
+			root, err := untarGz(parent, bytes.NewReader(data))
+			if name == "../outside" {
+				if err == nil {
+					t.Fatal("accepted an entry outside the extraction directory")
+				}
+				assertEmptyExtraction(t, parent)
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if filepath.Base(root) != "pkg" {
+				t.Fatalf("root = %q; want pkg directory", root)
+			}
+			assertArchiveFile(t, filepath.Join(root, "file"), "content")
+			if _, err := os.Lstat(filepath.Join(filepath.Dir(root), "pax_global_header")); !os.IsNotExist(err) {
+				t.Fatalf("global metadata became a filesystem entry: %v", err)
+			}
+		})
+	}
 }

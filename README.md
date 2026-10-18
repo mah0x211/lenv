@@ -147,7 +147,8 @@ $ lenv vers
 the following URLs are used to download the version files and source files.
 
 - Lua: https://lua.org/ftp/
-- LuaJIT: https://github.com/LuaJIT/LuaJIT.git
+- LuaJIT branches: https://api.github.com/repos/LuaJIT/LuaJIT/branches
+- LuaJIT source archive (v2.1 example): https://github.com/LuaJIT/LuaJIT/archive/refs/heads/v2.1.tar.gz
 - LuaRocks: https://luarocks.github.io/luarocks/releases/
 
 
@@ -161,6 +162,19 @@ $ lenv install 5.1.5 macosx
 $ lua -v
 Lua 5.1.5  Copyright (C) 1994-2012 Lua.org, PUC-Rio
 ```
+
+Downloads use HTTPS. Lua archives are verified with SHA-256, and LuaRocks
+archives with the publisher's PGP signature using the system's `gpg`, `gpg2` or `gpgv` command.
+The public key is fetched from https://github.com/hishamhm.gpg before each
+LuaRocks verification, including cached archives. If all verifiers are absent, `install --allow-missing-gpg ...`
+warns and proceeds without PGP verification; invalid signatures still fail when
+a verifier is available. LuaJIT is downloaded from GitHub for each installation.
+
+Downloaded archives are kept in `src/` for inspection. Sources are built in
+temporary directories and removed after each installation attempt.
+
+After upgrading lenv, run `lenv fetch` to refresh the version information
+and Lua checksums over HTTPS.
 
 the following example are installing the LuaJIT v2.1.
 
