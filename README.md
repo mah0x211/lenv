@@ -94,7 +94,8 @@ Commands:
   fetch                          Fetch remote versions
   vers                           List available versions
   ls                             List installed versions
-  install [--fetch] [--if-missing] <version> <opt...>
+  install [--fetch] [--if-missing] [--allow-missing-gpg]
+          [--rebuild | --no-rebuild] <version> <opt...>
                                  Install and use a <version> of lua
   use <version>                  Use a <version> of lua
   uninstall <version>            Uninstall a <version> of lua
@@ -112,6 +113,15 @@ Commands:
                          ; check Lua and LuaRocks independently
                          ; directory existence is checked, not binary validity
                          ; can be combined with --fetch
+
+    lenv install --rebuild 5.5.1 linux
+                         ; reuse sources and build output under build/, or extract if absent
+                         ; keep sources after success or failure; manual edits are not verified
+
+    lenv install --no-rebuild 5.5.1 linux
+                         ; delete existing sources without prompting, build fresh, then remove sources
+                         ; without either flag, existing sources require confirmation (default No)
+                         ; --if-missing skips installed targets without touching their sources
 
     lenv install latest  ; that picks the latest version
     lenv install 5       ; that picks the latest minor version and patch version
@@ -168,10 +178,22 @@ archives with the publisher's PGP signature using the system's `gpg`, `gpg2` or 
 The public key is fetched from https://github.com/hishamhm.gpg before each
 LuaRocks verification, including cached archives. If all verifiers are absent, `install --allow-missing-gpg ...`
 warns and proceeds without PGP verification; invalid signatures still fail when
-a verifier is available. LuaJIT is downloaded from GitHub for each installation.
+a verifier is available. Fresh LuaJIT sources are downloaded from GitHub for each installation.
 
-Downloaded archives are kept in `src/` for inspection. Sources are built in
-temporary directories and removed after each installation attempt.
+Downloaded archives are kept in `src/` for inspection. Sources are extracted under
+`build/lua/<version>`, `build/luajit/<branch>` or
+`build/luarocks/<lua-or-luajit>/<runtime-version>/<rocks-version>` within the lenv
+environment. LuaRocks builds for external runtime directories use a path-derived
+identifier under `build/luarocks/external/`.
+
+`install --rebuild ...` reuses existing sources and build output without downloading,
+verifying or cleaning them, and keeps them after success or failure. If sources are
+absent, it acquires and verifies archives normally. Use this mode to debug manual
+source changes. Without `--rebuild`, sources are removed after the attempt; replacing
+an existing source directory first requires confirmation (default No). Use
+`--no-rebuild` to authorize replacement without a prompt in automated jobs. The two
+flags are mutually exclusive and must precede the version. `--if-missing` skips
+installed targets without modifying their sources.
 
 After upgrading lenv, run `lenv fetch` to refresh the version information
 and Lua checksums over HTTPS.
@@ -228,6 +250,8 @@ lenv manages the following directories.
 ├── luajit/<ver>            -> luajit installation directory
 │   │
 │   :: same layout as the lua/<ver> directory ::
+│
+├── build/                  -> extracted sources and build output
 │
 └── src
     └── <cache>.tar.gz

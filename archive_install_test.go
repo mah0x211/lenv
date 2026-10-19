@@ -57,7 +57,7 @@ func TestArchiveExtractionInstallFlow(t *testing.T) {
 			completed := false
 			go func() {
 				defer close(done)
-				doInstall(cfg, &VerItem{Name: "source.tar.gz", Ver: "0.0.1", Sum: archiveSHA256(data)}, nil, false, false)
+				doInstall(cfg, &VerItem{Name: "source.tar.gz", Ver: "0.0.1", Sum: archiveSHA256(data)}, &installOptions{})
 				completed = true
 			}()
 			<-done
