@@ -106,11 +106,22 @@ func TestStartupDiagnosisBlocksCommandsWithoutInitializing(t *testing.T) {
 }
 
 func TestStartupOutputForAllCommands(t *testing.T) {
-	for _, command := range []string{"help", "current", "setup"} {
+	for _, command := range []struct {
+		name string
+		args []string
+	}{
+		{"help", []string{"help"}},
+		{"default-help", nil},
+		{"current", []string{"current"}},
+		{"path", []string{"path"}},
+		{"path-bin", []string{"path", "bin"}},
+		{"setup", []string{"setup"}},
+		{"setup-recover", []string{"setup", "--recover"}},
+	} {
 		for _, healthy := range []bool{false, true} {
-			name := command + "/missing"
+			name := command.name + "/missing"
 			if healthy {
-				name = command + "/healthy"
+				name = command.name + "/healthy"
 			}
 			t.Run(name, func(t *testing.T) {
 				project := t.TempDir()
@@ -119,17 +130,35 @@ func TestStartupOutputForAllCommands(t *testing.T) {
 						require.NoError(t, os.MkdirAll(filepath.Join(project, ".lenv", dir), 0755))
 					}
 				}
-				code, output := startupDiagnosisProcess(t, project, "-p", command)
+				args := append([]string{"-p"}, command.args...)
+				code, stdout, stderr := runCLICommand(t, project, args...)
 				message := "Checking required directories and current selection..."
-				require.Equal(t, 1, strings.Count(output, message), output)
-				if command == "current" && !healthy {
-					require.Equal(t, 1, code, output)
-					require.Less(t, strings.Index(output, message), strings.Index(output, "Error:"), output)
+				setup := strings.HasPrefix(command.name, "setup")
+				help := command.name == "help" || command.name == "default-help"
+				require.NotContains(t, stdout, message)
+				if setup {
+					require.Equal(t, 1, strings.Count(stderr, message), stderr)
 				} else {
-					require.Equal(t, 0, code, output)
+					require.NotContains(t, stderr, message)
+					if healthy {
+						require.Empty(t, stderr)
+					} else {
+						require.Contains(t, stderr, "Error: Cannot initialize lenv:")
+						require.Contains(t, stderr, "Run lenv -p setup")
+						require.NotContains(t, stdout, "Error:")
+					}
 				}
-				if command == "help" {
-					require.Less(t, strings.Index(output, message), strings.Index(output, "Usage:"), output)
+				if !healthy && !setup && !help {
+					require.Equal(t, 1, code, stderr)
+					require.Empty(t, stdout)
+				} else {
+					require.Equal(t, 0, code, stderr)
+				}
+				if help {
+					require.Contains(t, stdout, "Usage:")
+				}
+				if healthy && command.name == "path" {
+					require.Contains(t, stdout, "export PATH=")
 				}
 			})
 		}

@@ -338,9 +338,10 @@ Other commands stop with the affected path, type, cause, and a suggested setup
 command that preserves the `--global` or `--project` selection. Help remains
 available even when initialization is blocked.
 
-Startup reports the environment check to standard error for every command.
-Setup also reports creation, recovery, and completion stages. Errors are
-prefixed with `Error:` and conflicting entries include recovery guidance.
+Normal startup checks are silent unless a problem is found; diagnostics and
+recovery guidance are written to standard error. Setup also reports the check,
+creation, and recovery stages to standard error, followed by a completion message.
+Errors are prefixed with `Error:` and conflicting entries include recovery guidance.
 
 Run `setup` to create missing management directories and the selected
 environment's `luarocks` directory. This does not install LuaRocks. Pass

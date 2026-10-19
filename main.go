@@ -345,7 +345,9 @@ options:
 	}
 	init_global_vars(basedir)
 	startupRecovery.command = setupCommand(basedir, true)
-	fmt.Fprintln(os.Stderr, "Checking required directories and current selection...")
+	if len(argv) > 0 && argv[0] == "setup" {
+		fmt.Fprintln(os.Stderr, "Checking required directories and current selection...")
+	}
 	diagnosis := diagnoseStartup()
 	if len(argv) == 0 || argv[0] == "help" {
 		if !diagnosis.ready() {
