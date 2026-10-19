@@ -130,7 +130,7 @@ func TestPathShellSettingsFromProjectCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(os.Args[0], "-test.run=^TestPathShellCommandSubprocess$")
+	cmd := commandForLenvTest("TestPathShellCommandSubprocess", "-p", "path")
 	cmd.Dir = project
 	cmd.Env = append(os.Environ(), "LENV_PATH_SHELL_PROCESS=1")
 	var stderr bytes.Buffer

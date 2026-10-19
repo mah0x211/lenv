@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -37,7 +36,11 @@ func TestPathWithoutLua(t *testing.T) {
 	emptyPath := t.TempDir()
 	for _, target := range []string{"", "bin", "lualib", "luaclib"} {
 		t.Run(target, func(t *testing.T) {
-			cmd := exec.Command(os.Args[0], "-test.run=^TestPathWithoutLuaSubprocess$")
+			args := []string{"-p", "path"}
+			if target != "" {
+				args = append(args, target)
+			}
+			cmd := commandForLenvTest("TestPathWithoutLuaSubprocess", args...)
 			cmd.Dir = project
 			cmd.Env = append(os.Environ(), "PATH="+emptyPath, "LENV_PATH_WITHOUT_LUA_PROCESS=1", "LENV_PATH_WITHOUT_LUA_TARGET="+target,
 				"LUA_INIT=error('must not run')", "LUA_PATH=unexpected", "LUA_CPATH=unexpected", "LUA_PATH_5_5=unexpected", "LUA_CPATH_5_5=unexpected")

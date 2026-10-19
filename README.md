@@ -2,6 +2,7 @@ lenv
 =========
 
 [![test](https://github.com/mah0x211/lenv/actions/workflows/test.yml/badge.svg)](https://github.com/mah0x211/lenv/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/mah0x211/lenv/graph/badge.svg?token=ez0QgaFqQK)](https://codecov.io/gh/mah0x211/lenv)
 
 A Lua version manager for installing and switching between versions of Lua,
 LuaJIT and LuaRocks.

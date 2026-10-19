@@ -25,7 +25,7 @@ func startupDiagnosisProcess(t *testing.T, project string, args ...string) (int,
 	t.Helper()
 	data, err := json.Marshal(args)
 	require.NoError(t, err)
-	cmd := exec.Command(os.Args[0], "-test.run=^TestStartupDiagnosisSubprocess$")
+	cmd := commandForLenvTest("TestStartupDiagnosisSubprocess", args...)
 	cmd.Dir = project
 	cmd.Env = append(os.Environ(), "LENV_DIAG_PROCESS=1", "LENV_DIAG_ARGS="+string(data))
 	output, err := cmd.CombinedOutput()
