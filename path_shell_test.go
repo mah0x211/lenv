@@ -62,7 +62,10 @@ func assertLuaSettings(t *testing.T, got, prefix string, suffixes []string) {
 func TestPathShellSettingsPreserveLiteralValues(t *testing.T) {
 	old := CurrentDir
 	t.Cleanup(func() { CurrentDir = old })
-	patterns := GetLuaPackagePaths()
+	patterns := map[string][]string{
+		"LUA_PATH":  {"?.lua", "?/init.lua"},
+		"LUA_CPATH": {"?.so"},
+	}
 	base := t.TempDir()
 	for _, tc := range []struct{ name, path string }{
 		{"ordinary", "project"},
