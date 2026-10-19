@@ -55,6 +55,8 @@ try:
                         os.rename(path, path + ".saved")
                         with open(path, "w") as f:
                             f.write("replacement")
+                    elif mutation == "move":
+                        os.rename(path, path + ".saved")
                     elif mutation == "contents":
                         with open(os.path.join(path, "new-content"), "w") as f:
                             f.write("new")

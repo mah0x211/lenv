@@ -127,3 +127,14 @@ func TestBuildSourcePromptRejectsPipedApproval(t *testing.T) {
 	assertArchiveFile(t, filepath.Join(source, "input"), "edited")
 	assertArchiveFile(t, filepath.Join(installed, "marker"), "installed")
 }
+
+func TestBuildSourcePromptRejectsMovedTarget(t *testing.T) {
+	project, source, installed := buildSourceProject(t)
+	result := buildSourceProcess(t, project, []string{"yes"}, "move", "-p", "install", "5.5.1")
+	require.Equal(t, 1, result.Exit, result.Output)
+	require.Contains(t, result.Output, "cannot recheck build sources")
+	_, err := os.Lstat(source)
+	require.True(t, os.IsNotExist(err))
+	assertArchiveFile(t, filepath.Join(source+".saved", "input"), "edited")
+	assertArchiveFile(t, filepath.Join(installed, "marker"), "installed")
+}
