@@ -423,9 +423,9 @@ func sourceURL(cfg *TargetConfig, item *VerItem) string {
 	return cfg.DownloadURL + filepath.Clean(item.Name)
 }
 
-func doInstall(cfg *TargetConfig, item *VerItem, opts []string, ifMissing, allowMissingGPG bool) {
+func doInstall(cfg *TargetConfig, item *VerItem, options *installOptions) {
 	instdir := filepath.Join(cfg.RootDir, item.Ver)
-	if ifMissing {
+	if options.ifMissing {
 		installed, err := isDir(instdir)
 		if err != nil {
 			fatalf("failed to check installation directory: %v", err)
@@ -436,42 +436,13 @@ func doInstall(cfg *TargetConfig, item *VerItem, opts []string, ifMissing, allow
 			return
 		}
 	}
-	skipPGP := false
-	if cfg.Name == "luarocks" {
-		if _, err := findGPG(); err != nil {
-			if !errors.Is(err, errGPGNotFound) {
-				fatalf("%v", err)
-			}
-			if !allowMissingGPG {
-				fatalf("%v; use --allow-missing-gpg to proceed without signature verification", errGPGNotFound)
-			}
-			eprintf("Warning: no PGP verification command was found; LuaRocks PGP signature verification is disabled for this installation.")
-			skipPGP = true
-		}
-	}
 	printf("install %q", item.Ver)
-
-	url := sourceURL(cfg, item)
-	tmpdir, err := os.MkdirTemp(os.TempDir(), "lenv_tmp_")
+	dir, err := prepareBuildSource(cfg, item, options)
 	if err != nil {
-		fatalf("failed to create tempdir: %v", err)
+		fatalf("failed to prepare build sources: %v", err)
 	}
-	defer os.RemoveAll(tmpdir)
-
-	var dir string
-	// Branch archives are mutable; always download the current LuaJIT source.
-	if cfg.Name != "luajit" {
-		dir, err = extractCachedFile(tmpdir, url, cfg, item, skipPGP)
-	}
-	if dir != "" {
-		println("use cached file")
-	} else {
-		if err != nil {
-			printf("failed to extract cached file: %v", err)
-		}
-		if dir, err = extractDownloadedFile(tmpdir, url, cfg, item, skipPGP); err != nil {
-			fatalf("failed to extract downloaded file: %v", err)
-		}
+	if !options.rebuild {
+		defer os.RemoveAll(dir)
 	}
 
 	printf("remove old directory: %s", instdir)
@@ -486,9 +457,9 @@ func doInstall(cfg *TargetConfig, item *VerItem, opts []string, ifMissing, allow
 
 	switch cfg.Name {
 	case "lua":
-		err = installLua(instdir, opts)
+		err = installLua(instdir, options.build)
 	case "luajit":
-		err = installLuaJit(instdir, opts)
+		err = installLuaJit(instdir, options.build)
 	case "luarocks":
 		err = installRocks(instdir, cfg)
 	default:
@@ -508,6 +479,8 @@ type installOptions struct {
 	fetch           bool
 	ifMissing       bool
 	allowMissingGPG bool
+	rebuild         bool
+	noRebuild       bool
 	version         string
 	build           []string
 }
@@ -520,12 +493,19 @@ func parseInstallOptions(args []string) (*installOptions, error) {
 			options.fetch = true
 		case "--if-missing":
 			options.ifMissing = true
+		case "--rebuild":
+			options.rebuild = true
+		case "--no-rebuild":
+			options.noRebuild = true
 		case "--allow-missing-gpg":
 			options.allowMissingGPG = true
 		default:
 			return nil, fmt.Errorf("unknown install option %q", args[0])
 		}
 		args = args[1:]
+	}
+	if options.rebuild && options.noRebuild {
+		return nil, fmt.Errorf("--rebuild and --no-rebuild cannot be combined")
 	}
 	if len(args) == 0 || args[0] == "" || args[0] == ":" {
 		return nil, fmt.Errorf("no version specified")
@@ -550,11 +530,11 @@ func prepareInstall(args []string) (*TargetVersion, *installOptions) {
 func CmdInstall(opts []string) {
 	target, options := prepareInstall(opts)
 	if target.Lua != nil {
-		doInstall(target.Lua.Config, target.Lua.Version, options.build, options.ifMissing, options.allowMissingGPG)
+		doInstall(target.Lua.Config, target.Lua.Version, options)
 	}
 	if target.LuaRocks != nil {
 		ResolveCurrentDir()
 		CheckLuaRocksRootDir()
-		doInstall(target.LuaRocks.Config, target.LuaRocks.Version, options.build, options.ifMissing, options.allowMissingGPG)
+		doInstall(target.LuaRocks.Config, target.LuaRocks.Version, options)
 	}
 }

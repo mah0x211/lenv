@@ -78,7 +78,8 @@ Commands:
   fetch                          Fetch remote versions
   vers                           List available versions
   ls                             List installed versions
-  install [--fetch] [--if-missing] [--allow-missing-gpg] <version> <opt...>
+  install [--fetch] [--if-missing] [--allow-missing-gpg]
+          [--rebuild | --no-rebuild] <version> <opt...>
                                  Install and use a <version> of lua
   use <version>                  Use a <version> of lua
   uninstall <version>            Uninstall a <version> of lua
@@ -100,6 +101,15 @@ Commands:
     lenv install --allow-missing-gpg :latest
                          ; warn and install without PGP verification only if gpg, gpg2 and gpgv are absent
                          ; signature verification errors still stop when a verifier is available
+
+    lenv install --rebuild 5.5.1 linux
+                         ; reuse sources and build output under build/, or extract if absent
+                         ; keep sources after success or failure; manual edits are not verified
+
+    lenv install --no-rebuild 5.5.1 linux
+                         ; delete existing sources without prompting, build fresh, then remove sources
+                         ; without either flag, existing sources require confirmation (default No)
+                         ; --if-missing skips installed targets without touching their sources
 
     lenv install latest  ; that picks the latest version
     lenv install 5       ; that picks the latest minor version and patch version
