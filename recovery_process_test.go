@@ -23,8 +23,9 @@ env = os.environ.copy()
 env["LENV_RECOVERY_PROCESS"] = "1"
 env["LENV_RECOVERY_ARGS"] = json.dumps(args)
 command = [exe, "-test.run=^TestRecoverySubprocess$"]
-if env.get("LENV_RECOVERY_EXECUTABLE"):
-    command = [env["LENV_RECOVERY_EXECUTABLE"], *args]
+executable = env.get("LENV_TEST_EXECUTABLE") or env.get("LENV_RECOVERY_EXECUTABLE")
+if executable:
+    command = [executable, *args]
 p = subprocess.Popen(command, cwd=directory,
                      stdin=slave, stdout=slave, stderr=slave, env=env)
 os.close(slave)
@@ -270,7 +271,7 @@ func TestInteractiveRecoveryRechecksTarget(t *testing.T) {
 
 func TestNoninteractiveRecoveryRejectsPipedApproval(t *testing.T) {
 	project, _ := recoveryProject(t, "current-file")
-	cmd := exec.Command(os.Args[0], "-test.run=^TestRecoverySubprocess$")
+	cmd := commandForLenvTest("TestRecoverySubprocess", "-p", "setup", "--recover")
 	cmd.Dir = project
 	cmd.Env = append(os.Environ(), "LENV_RECOVERY_PROCESS=1", `LENV_RECOVERY_ARGS=["-p","setup","--recover"]`)
 	cmd.Stdin = strings.NewReader("yes\n")

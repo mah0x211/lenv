@@ -117,7 +117,7 @@ func TestBuildSourcePromptRechecksTarget(t *testing.T) {
 
 func TestBuildSourcePromptRejectsPipedApproval(t *testing.T) {
 	project, source, installed := buildSourceProject(t)
-	cmd := exec.Command(os.Args[0], "-test.run=^TestRecoverySubprocess$")
+	cmd := commandForLenvTest("TestRecoverySubprocess", "-p", "install", "5.5.1")
 	cmd.Dir = project
 	cmd.Env = append(os.Environ(), "LENV_RECOVERY_PROCESS=1", `LENV_RECOVERY_ARGS=["-p","install","5.5.1"]`)
 	cmd.Stdin = strings.NewReader("yes\n")
