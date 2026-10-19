@@ -24,7 +24,7 @@ Usage:
 
 Options:
   -g, --global                   Use /usr/local/lenv as installation directory
-  -p, --project                  Use current directory as installation directory
+  -p, --project                  Use .lenv in the current directory
 
   Note:
     The lenv command searches for a .lenv directory in the current directory,
@@ -116,8 +116,8 @@ Commands:
     lenv install 5.4     ; that picks the latest patch version
     lenv install lj-v2.1 ; that picks the version of luajit
 
-    lenv install latest:latest ; that picks the the latest version of lua and
-                               ; luarocks in current lua environment
+    lenv install latest:latest ; pick the latest versions of Lua and LuaRocks
+                               ; install LuaRocks for that Lua installation
     lenv install :latest       ; that picks the the latest version of luarocks
                                  in current lua environment
 

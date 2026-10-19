@@ -3,32 +3,69 @@ lenv
 
 [![test](https://github.com/mah0x211/lenv/actions/workflows/test.yml/badge.svg)](https://github.com/mah0x211/lenv/actions/workflows/test.yml)
 
-Lua Version Manager.
+A Lua version manager for installing and switching between versions of Lua,
+LuaJIT and LuaRocks.
+
+> This README describes `master`. Published binaries may not include all options
+> and fixes below. Run `lenv help` to see the commands and options available
+> in your installation.
 
 ---
 
 ## Installation
 
-1. download a binary release from the [releases](https://github.com/mah0x211/lenv/releases) page.
-2. extract and place the `lenv` command in your PATH (e.g. `/usr/local/bin/lenv`).
-3. run a `lenv setup` command to set up the required files and directories.
-    - For default (`$HOME/.lenv`) setup: `lenv setup`
+1. Download a binary release for your OS and CPU from the [releases](https://github.com/mah0x211/lenv/releases) page.
+2. Extract the archive and place the `lenv` executable in a directory on your `PATH` (e.g. `/usr/local/bin`).
+3. Run `lenv setup` to create the required directories.
+    - For automatic environment selection: `lenv setup`
+      (the nearest actual `.lenv` directory, then `/usr/local/lenv`, otherwise `$HOME/.lenv`).
     - For global (`/usr/local/lenv`) setup: `lenv -g setup`
-    - For project-local (`current directory`) setup: `lenv -p setup`
+    - For project-local (`.lenv` in the current directory) setup: `lenv -p setup`
+
+`setup` creates management directories; it does not install Lua or LuaRocks.
 
 ### Shell configuration
 
-1. run `lenv path > ~/.lenvrc` command to create the `lenvrc` file.
-    - if you set up the required files and directories in the `/usr/local/lenv` directory, you should run a `lenv -g path > ~/.lenvrc` command.
-2. add the following to your `.bashrc` or `.bash_profile` file.
+1. Run `lenv path > ~/.lenvrc` to save the shell settings to `~/.lenvrc`.
+    - Use the same environment selection as `setup`: `lenv -g path > ~/.lenvrc`
+      for global setup, or `lenv -p path > .lenv/lenvrc` for project-local setup.
+2. For settings saved to `~/.lenvrc`, load the file in the current shell and add
+   the same line to your `.bashrc` or `.bash_profile` file (`.zshrc` for zsh).
     ```sh
     source ~/.lenvrc
     ```
 
+For project-local setup, run `source .lenv/lenvrc` from the project directory.
+If you load this file from a shell startup file, use its absolute path so that
+it can be read regardless of the shell's working directory.
+
+Generated settings point to the selected environment's absolute `current` path.
+Changing directories does not automatically switch shell settings to another
+project; generate and load settings for that project. `lenv use` switches the
+runtime within the same environment without regenerating the settings.
+
+#### Path compatibility
+
+On `master` after [f02ff1b](https://github.com/mah0x211/lenv/commit/f02ff1b),
+`lenv path` works without an installed or selected Lua. A regression in earlier
+releases requires an executable on `PATH` before generating module-path settings:
+
+- [v0.8.1](https://github.com/mah0x211/lenv/releases/tag/v0.8.1) runs `luarocks path`.
+- [v0.9.0](https://github.com/mah0x211/lenv/releases/tag/v0.9.0) and
+  [v0.9.1](https://github.com/mah0x211/lenv/releases/tag/v0.9.1) run `lua`.
+
+This affects `path`, `path lualib` and `path luaclib`; `path bin` is unaffected.
+The fix is not yet included in a tagged release.
+
+On current `master`, `LUA_PATH` and `LUA_CPATH` end in `;;`, which Lua expands
+into its compiled default search paths. Where supported, version-specific Lua
+variables take precedence over lenv's unversioned variables; see
+[Lua's package.path documentation](https://www.lua.org/manual/5.5/manual.html#pdf-package.path).
+
 
 ## Commands
 
-please run a `help` command to show the help message.
+Run `lenv help` to display the available commands and options.
 
 ```
 $ lenv help
@@ -40,7 +77,7 @@ Usage:
 
 Options:
   -g, --global                   Use /usr/local/lenv as installation directory
-  -p, --project                  Use current directory as installation directory
+  -p, --project                  Use .lenv in the current directory
 
   Note:
     The lenv command searches for a .lenv directory in the current directory,
@@ -114,6 +151,10 @@ Commands:
                          ; directory existence is checked, not binary validity
                          ; can be combined with --fetch
 
+    lenv install --allow-missing-gpg :latest
+                         ; warn and install without PGP verification only if gpg, gpg2 and gpgv are absent
+                         ; signature verification errors still stop when a verifier is available
+
     lenv install --rebuild 5.5.1 linux
                          ; reuse sources and build output under build/, or extract if absent
                          ; keep sources after success or failure; manual edits are not verified
@@ -128,8 +169,8 @@ Commands:
     lenv install 5.4     ; that picks the latest patch version
     lenv install lj-v2.1 ; that picks the version of luajit
 
-    lenv install latest:latest ; that picks the the latest version of lua and
-                               ; luarocks in current lua environment
+    lenv install latest:latest ; pick the latest versions of Lua and LuaRocks
+                               ; install LuaRocks for that Lua installation
     lenv install :latest       ; that picks the the latest version of luarocks
                                  in current lua environment
 
@@ -143,7 +184,17 @@ Commands:
 
 ```
 
-**NOTE: you must run a `fetch` command at the first. that command will crawling the version files of `Lua`, `LuaJIT` and `LuaRocks` immediately.**
+Global options must precede the command, and `--global` and `--project` cannot
+be combined. Install options must precede the version; following arguments are
+passed to `make` for Lua and LuaJIT.
+
+When both runtime and LuaRocks versions are specified, such as `latest:latest`,
+LuaRocks is installed for the specified runtime, not the previously selected one.
+A rocks-only expression such as `:latest` targets the currently selected runtime.
+
+**Before selecting a version, run `lenv fetch` or use `install --fetch ...`.**
+`--fetch` refreshes all version lists before installation and stops if any
+refresh fails.
 
 ```sh
 $ lenv fetch
@@ -154,7 +205,7 @@ $ lenv vers
 
 **Package URLs**
 
-the following URLs are used to download the version files and source files.
+lenv uses the following URLs to fetch version information and source archives.
 
 - Lua: https://lua.org/ftp/
 - LuaJIT branches: https://api.github.com/repos/LuaJIT/LuaJIT/branches
@@ -164,7 +215,11 @@ the following URLs are used to download the version files and source files.
 
 ## Usage
 
-the following example are installing the Lua 5.1.5.
+Lua and LuaJIT are built from source. Install a C compiler, `make`, and the
+libraries and headers required by the chosen build target. LuaRocks signature
+verification requires one of `gpg`, `gpg2` or `gpgv`.
+
+The following example installs Lua 5.1.5 on macOS.
 
 ```sh
 $ lenv install 5.1.5 macosx
@@ -174,20 +229,25 @@ Lua 5.1.5  Copyright (C) 1994-2012 Lua.org, PUC-Rio
 ```
 
 Downloads use HTTPS. Lua archives are verified with SHA-256, and LuaRocks
-archives with the publisher's PGP signature using the system's `gpg`, `gpg2` or `gpgv` command.
-The public key is fetched from https://github.com/hishamhm.gpg before each
-LuaRocks verification, including cached archives. If all verifiers are absent, `install --allow-missing-gpg ...`
-warns and proceeds without PGP verification; invalid signatures still fail when
-a verifier is available. Fresh LuaJIT sources are downloaded from GitHub for each installation.
+archives are verified against the publisher's PGP signature using the system's
+`gpg`, `gpg2` or `gpgv` command. The public key is fetched from
+https://github.com/hishamhm.gpg before each LuaRocks verification, including for
+cached archives. If none of these commands is installed,
+`install --allow-missing-gpg ...` warns and continues without PGP verification.
+This option does not bypass verification failures when a verifier is available.
+If a cached archive fails verification, lenv downloads and verifies it again;
+installation stops if verification of the downloaded archive fails. Fresh LuaJIT
+sources are downloaded from GitHub for each installation.
 
-Downloaded archives are kept in `src/` for inspection. Sources are extracted under
+Downloaded archives are kept in `src/` for inspection. The same verification
+rules apply to cached Lua and LuaRocks archives. Sources are extracted under
 `build/lua/<version>`, `build/luajit/<branch>` or
 `build/luarocks/<lua-or-luajit>/<runtime-version>/<rocks-version>` within the lenv
 environment. LuaRocks builds for external runtime directories use a path-derived
 identifier under `build/luarocks/external/`.
 
 `install --rebuild ...` reuses existing sources and build output without downloading,
-verifying or cleaning them, and keeps them after success or failure. If sources are
+verifying or cleaning them, and retains them whether the build succeeds or fails. If sources are
 absent, it acquires and verifies archives normally. Use this mode to debug manual
 source changes. Without `--rebuild`, sources are removed after the attempt; replacing
 an existing source directory first requires confirmation (default No). Use
@@ -198,7 +258,7 @@ installed targets without modifying their sources.
 After upgrading lenv, run `lenv fetch` to refresh the version information
 and Lua checksums over HTTPS.
 
-the following example are installing the LuaJIT v2.1.
+The following example installs LuaJIT from the `v2.1` branch.
 
 ```sh
 $ lenv install lj-v2.1
@@ -207,38 +267,47 @@ $ lua -v
 LuaJIT 2.1.1710088188 -- Copyright (C) 2005-2023 Mike Pall. https://luajit.org/
 ```
 
-the following example are installing the LuaRocks 3.5.0 for Lua 5.1.5.
+The following example installs LuaRocks 3.5.0 for Lua 5.1.5.
 
 ```sh
 $ lenv use 5.1.5
 use lua version 5.1.5 ("lua/5.1.5")
-$ lenv install-rocks 3.5.0
+$ lenv install :3.5.0
 ...snip...
 $ luarocks --version
-/Users/mah/.lenv/current/lua_modules/bin/luarocks 3.5.0
-LuaRocks main command-line interface
+...snip...
 ```
 
-the following example are installing the lua and luarocks at same time.
+The following example installs Lua 5.1.5 and the latest available LuaRocks version
+for that Lua installation.
 
 ```sh
-$ lenv install 5.1.:latest
+$ lenv install 5.1.:latest macosx
 ...snip...
 $ lua -v
 Lua 5.1.5  Copyright (C) 1994-2012 Lua.org, PUC-Rio
 $ luarocks --version
-/Users/mah/.lenv/current/lua_modules/bin/luarocks 3.9.2
-LuaRocks main command-line interface
+...snip...
 ```
 
+
+Installing a version automatically selects it. Reinstalling Lua or LuaJIT
+replaces its installation directory, including LuaRocks installations beneath
+it; `--if-missing` preserves an existing installation.
+
+`uninstall` requires exact version names. Removing Lua or LuaJIT also removes
+its LuaRocks installations; a LuaRocks suffix is ignored when a runtime is
+specified. To remove only LuaRocks, use `lenv uninstall :3.5.0` with the desired
+runtime selected. If removal leaves `current` pointing to a missing runtime,
+use `lenv setup --recover` to clear the selection.
 
 ### Installation Locations
 
-lenv manages the following directories.
+lenv uses the following directory layout (`~/.lenv` is shown as an example).
 
 ```
 ~/.lenv
-├── current                 -> symlink to the `lua/<ver> or `luajit/<ver>` directory
+├── current                 -> symlink to the lua/<ver> or luajit/<ver> directory
 ├── lua/<ver>               -> lua installation directory
 │   ├── lua_modules         -> symlink to `luarocks/<ver>/lua_modules`
 │   └── luarocks/<ver>      -> luarocks installation directory for lua/<ver>
