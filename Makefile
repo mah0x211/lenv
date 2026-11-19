@@ -6,6 +6,7 @@ BUILD_DIR := $(PWD)/build
 TEST_BUILD_DIR ?= $(BUILD_DIR)/test
 COVERPROFILE ?= coverage.txt
 COVERHTML ?= coverage.html
+TEST_TIMEOUT ?= 5m
 GOPATH:=$(PWD)/build/deps
 GOLINT := `which golangci-lint`
 LINT_OPT=--issues-exit-code=0 \
@@ -27,18 +28,16 @@ GOPATH:=$(GOPATH)
 all: test build
 
 lint:
-	$(GOLINT) run $(LINT_OPT) .
+	$(GOLINT) run $(LINT_OPT) ./...
 
-# Share coverage counters between the test executable and real CLI subprocesses.
+# Run every package test and use the real CLI for subprocess tests.
 test:
 	mkdir -p "$(abspath $(TEST_BUILD_DIR))"
-	go build -race -cover -covermode=atomic -o "$(abspath $(TEST_BUILD_DIR))/lenv" .
-	go test -c -race -p 1 -cover -covermode=atomic -o "$(abspath $(TEST_BUILD_DIR))/suite.test" .
-	@set -eu; \
-	coverdir=$$(mktemp -d "$(abspath $(TEST_BUILD_DIR))/coverage.XXXXXX"); \
-	GOCOVERDIR="$$coverdir" LENV_TEST_EXECUTABLE="$(abspath $(TEST_BUILD_DIR))/lenv" \
-	"$(abspath $(TEST_BUILD_DIR))/suite.test" -test.count=1 -test.timeout=1m \
-		-test.gocoverdir="$$coverdir" -test.coverprofile="$(COVERPROFILE)"
+	go build -race -cover -covermode=atomic -coverpkg=./internal/... -o "$(abspath $(TEST_BUILD_DIR))/lenv" ./cmd/lenv
+	LENV_TEST_EXECUTABLE="$(abspath $(TEST_BUILD_DIR))/lenv" \
+		go test -race -p 1 -count=1 -timeout="$(TEST_TIMEOUT)" \
+		-covermode=atomic -coverpkg=./internal/... \
+		-coverprofile="$(abspath $(COVERPROFILE))" ./internal/...
 	go tool cover -html "$(COVERPROFILE)" -o "$(COVERHTML)"
 
 coverage: test
@@ -49,4 +48,4 @@ clean:
 	rm -rf $(PWD)/build
 
 build:
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o $(PWD)/build/lenv -v .
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o $(PWD)/build/lenv -v ./cmd/lenv
