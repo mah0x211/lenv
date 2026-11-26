@@ -4,7 +4,8 @@ before:
     # You may remove this if you don't use go modules.
     - go mod download
 builds:
-  - env:
+  - main: ./cmd/lenv
+    env:
       - CGO_ENABLED=0
     goos:
       - linux

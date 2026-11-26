@@ -6,6 +6,7 @@ BUILD_DIR := $(PWD)/build
 TEST_BUILD_DIR ?= $(BUILD_DIR)/test
 COVERPROFILE ?= coverage.txt
 COVERHTML ?= coverage.html
+TEST_TIMEOUT ?= 5m
 GOPATH:=$(PWD)/build/deps
 GOLINT := `which golangci-lint`
 LINT_OPT=--issues-exit-code=0 \
@@ -27,19 +28,31 @@ GOPATH:=$(GOPATH)
 all: test build
 
 lint:
-	$(GOLINT) run $(LINT_OPT) .
+	$(GOLINT) run $(LINT_OPT) ./...
 
-# Share coverage counters between the test executable and real CLI subprocesses.
+# Combine coverage from package tests and the real CLI subprocesses.
 test:
 	mkdir -p "$(abspath $(TEST_BUILD_DIR))"
-	go build -race -cover -covermode=atomic -o "$(abspath $(TEST_BUILD_DIR))/lenv" .
-	go test -c -race -p 1 -cover -covermode=atomic -o "$(abspath $(TEST_BUILD_DIR))/suite.test" .
 	@set -eu; \
-	coverdir=$$(mktemp -d "$(abspath $(TEST_BUILD_DIR))/coverage.XXXXXX"); \
-	GOCOVERDIR="$$coverdir" LENV_TEST_EXECUTABLE="$(abspath $(TEST_BUILD_DIR))/lenv" \
-	"$(abspath $(TEST_BUILD_DIR))/suite.test" -test.count=1 -test.timeout=1m \
-		-test.gocoverdir="$$coverdir" -test.coverprofile="$(COVERPROFILE)"
-	go tool cover -html "$(COVERPROFILE)" -o "$(COVERHTML)"
+	work=$$(mktemp -d "$(abspath $(TEST_BUILD_DIR))/coverage.XXXXXX"); \
+	trap 'rm -rf "$$work"' EXIT; \
+	mkdir "$$work/cli"; \
+	packages=$$(go list ./internal/...); \
+	coverpkg=$$(printf '%s\n' "$$packages" | awk '!/\/internal\/testutil(\/|$$)/ { printf "%s%s", separator, $$0; separator = "," }'); \
+	test -n "$$coverpkg"; \
+	go build -race -cover -covermode=atomic -coverpkg="$$coverpkg,./cmd/lenv" -o "$$work/lenv" ./cmd/lenv; \
+	LENV_TEST_EXECUTABLE="$$work/lenv" LENV_TEST_COVERDIR="$$work/cli" \
+		go test -race -p 1 -count=1 -timeout="$(TEST_TIMEOUT)" \
+		-covermode=atomic -coverpkg="$$coverpkg" -coverprofile="$$work/tests.txt" ./internal/...; \
+	go tool covdata textfmt -i="$$work/cli" -o="$$work/cli.txt"; \
+	awk 'NF == 3 && $$3 > 0 { found = 1; exit } END { exit !found }' "$$work/cli.txt" \
+		|| { printf '%s\n' 'No coverage counters from the CLI subprocesses' >&2; exit 1; }; \
+	awk 'FNR > 1 { statements[$$1] = $$2; hits[$$1] += $$3 } \
+		END { for (block in hits) printf "%s %d %.0f\n", block, statements[block], hits[block] }' \
+		"$$work/tests.txt" "$$work/cli.txt" > "$$work/blocks.txt"; \
+	{ printf '%s\n' 'mode: atomic'; LC_ALL=C sort "$$work/blocks.txt"; } > "$$work/coverage.txt"; \
+	go tool cover -html "$$work/coverage.txt" -o "$(abspath $(COVERHTML))"; \
+	mv "$$work/coverage.txt" "$(abspath $(COVERPROFILE))"
 
 coverage: test
 	go tool cover -func="$(COVERPROFILE)"
@@ -49,4 +62,4 @@ clean:
 	rm -rf $(PWD)/build
 
 build:
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o $(PWD)/build/lenv -v .
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o $(PWD)/build/lenv -v ./cmd/lenv
