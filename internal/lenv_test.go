@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"net/http"
@@ -23,12 +22,22 @@ import (
 )
 
 // Prefer the actual instrumented CLI when coverage is collected by make test.
-// Direct go test runs keep using the existing subprocess entry points.
-func commandForLenvTest(helper string, args ...string) *exec.Cmd {
-	if executable := os.Getenv("LENV_TEST_EXECUTABLE"); executable != "" {
-		return exec.Command(executable, args...)
+func commandForLenvTest(t *testing.T, project, fallbackExecutable string, args ...string) *exec.Cmd {
+	t.Helper()
+	executable := os.Getenv("LENV_TEST_EXECUTABLE")
+	if executable == "" {
+		executable = fallbackExecutable
 	}
-	return exec.Command(os.Args[0], "-test.run=^"+helper+"$")
+	if executable == "" {
+		return testutil.TestChild(t, "TestLenvSubprocess", project, args...)
+	}
+	cmd := exec.Command(executable, args...)
+	cmd.Dir = project
+	cmd.Env = os.Environ()
+	if dir := os.Getenv("LENV_TEST_COVERDIR"); dir != "" {
+		cmd.Env = append(cmd.Env, "GOCOVERDIR="+dir)
+	}
+	return cmd
 }
 
 func newCLIProject(t *testing.T) (string, string) {
@@ -61,11 +70,7 @@ func newCLIProject(t *testing.T) (string, string) {
 
 func runCLICommand(t *testing.T, project string, args ...string) (int, string, string) {
 	t.Helper()
-	data, err := json.Marshal(args)
-	require.NoError(t, err)
-	cmd := commandForLenvTest("TestStartupDiagnosisSubprocess", args...)
-	cmd.Dir = project
-	cmd.Env = append(os.Environ(), "LENV_DIAG_PROCESS=1", "LENV_DIAG_ARGS="+string(data))
+	cmd := commandForLenvTest(t, project, "", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	code := 0
@@ -117,18 +122,12 @@ func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return fn(req)
 }
 
-func installedProjectTestDirectory(t *testing.T, path string) {
-	t.Helper()
-	require.NoError(t, os.MkdirAll(path, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(path, "marker"), []byte("keep"), 0600))
-}
-
 func TestProjectOptionWithIfMissing(t *testing.T) {
 	project, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
 	manager := filepath.Join(project, ".lenv")
 	selected := filepath.Join(manager, "lua", "5.5.1")
-	installedProjectTestDirectory(t, selected)
+	testutil.CreateDirectoryWithMarker(t, selected)
 	require.NoError(t, os.MkdirAll(filepath.Join(manager, "src"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(manager, "luajit"), 0755))
 	versions := version.NewVersions()
@@ -159,23 +158,18 @@ func TestProjectOptionWithIfMissing(t *testing.T) {
 	require.Zero(t, atomic.LoadInt32(&requests))
 }
 
-func TestStartupDiagnosisSubprocess(t *testing.T) {
-	if os.Getenv("LENV_DIAG_PROCESS") != "1" {
+func TestLenvSubprocess(t *testing.T) {
+	args, ok := testutil.TestChildArgs(t)
+	if !ok {
 		return
 	}
-	var args []string
-	require.NoError(t, json.Unmarshal([]byte(os.Getenv("LENV_DIAG_ARGS")), &args))
 	os.Args = append([]string{"lenv"}, args...)
 	main()
 }
 
 func startupDiagnosisProcess(t *testing.T, project string, args ...string) (int, string) {
 	t.Helper()
-	data, err := json.Marshal(args)
-	require.NoError(t, err)
-	cmd := commandForLenvTest("TestStartupDiagnosisSubprocess", args...)
-	cmd.Dir = project
-	cmd.Env = append(os.Environ(), "LENV_DIAG_PROCESS=1", "LENV_DIAG_ARGS="+string(data))
+	cmd := commandForLenvTest(t, project, "", args...)
 	output, err := cmd.CombinedOutput()
 	code := 0
 	if err != nil {
@@ -237,20 +231,6 @@ func TestStartupDiagnosisSetupReachableForInvalidCurrent(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "keep", string(data))
 	require.NotContains(t, output, "Delete and recover?")
-}
-
-func TestStartupDiagnosisBlocksCommandsWithoutInitializing(t *testing.T) {
-	project := t.TempDir()
-	code, output := startupDiagnosisProcess(t, project, "-p", "current")
-	require.Equal(t, 1, code, output)
-	require.Contains(t, output, "Run lenv -p setup")
-	_, err := os.Lstat(filepath.Join(project, ".lenv"))
-	require.True(t, os.IsNotExist(err))
-	code, output = startupDiagnosisProcess(t, project, "-p", "help")
-	require.Equal(t, 0, code, output)
-	require.Contains(t, output, "Usage:")
-	_, err = os.Lstat(filepath.Join(project, ".lenv"))
-	require.True(t, os.IsNotExist(err))
 }
 
 func TestStartupOutputForAllCommands(t *testing.T) {
@@ -426,25 +406,6 @@ func TestPathWithoutLua(t *testing.T) {
 	}
 }
 
-func sourcePathSettings(t *testing.T, shell, file, inherited string) []string {
-	t.Helper()
-	cmd := exec.Command(shell, "-c", `. "$1"; printf '%s\000%s\000%s\000' "$PATH" "$LUA_PATH" "$LUA_CPATH"`, "path-settings", file)
-	// The inherited values deliberately differ from the generating process.
-	// Quoted expansions must preserve them without interpreting their contents.
-	cmd.Env = []string{"PATH=" + inherited, "LUA_PATH=previous", "LUA_CPATH=previous"}
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	data, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("source settings with %s: %v\n%s", shell, err, stderr.String())
-	}
-	values := strings.Split(string(data), "\x00")
-	if len(values) != 4 || values[3] != "" {
-		t.Fatalf("invalid environment output: %q", data)
-	}
-	return values[:3]
-}
-
 func TestPathShellSettingsFromProjectCommand(t *testing.T) {
 	base := t.TempDir()
 	project := filepath.Join(base, "project ' \"$HOME $(printf changed) `printf changed`")
@@ -466,7 +427,7 @@ func TestPathShellSettingsFromProjectCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, shell := range []string{"/bin/sh", "/bin/bash"} {
-		values := sourcePathSettings(t, shell, rc, "/inherited/bin")
+		values := testutil.SourcePathSettings(t, shell, rc, "/inherited/bin")
 		current := filepath.Join(project, ".lenv", "current")
 		want := filepath.Join(current, "bin") + ":" + filepath.Join(current, "lua_modules/bin") + ":/inherited/bin"
 		if values[0] != want {
@@ -583,28 +544,9 @@ func TestRecoveryBlocksOtherCommandsWithoutChanges(t *testing.T) {
 	}
 }
 
-func TestRecoverySubprocess(t *testing.T) {
-	if os.Getenv("LENV_RECOVERY_PROCESS") != "1" {
-		return
-	}
-	var args []string
-	if err := json.Unmarshal([]byte(os.Getenv("LENV_RECOVERY_ARGS")), &args); err != nil {
-		panic(err)
-	}
-	os.Args = append([]string{"lenv"}, args...)
-	main()
-}
-
 func recoveryProcess(t *testing.T, project string, answers []string, args ...string) testutil.PTYResult {
 	t.Helper()
-	data, err := json.Marshal(args)
-	require.NoError(t, err)
-	cmd := commandForLenvTest("TestRecoverySubprocess", args...)
-	if executable := os.Getenv("LENV_RECOVERY_EXECUTABLE"); os.Getenv("LENV_TEST_EXECUTABLE") == "" && executable != "" {
-		cmd = exec.Command(executable, args...)
-	}
-	cmd.Dir = project
-	cmd.Env = append(os.Environ(), "LENV_RECOVERY_PROCESS=1", "LENV_RECOVERY_ARGS="+string(data))
+	cmd := commandForLenvTest(t, project, os.Getenv("LENV_RECOVERY_EXECUTABLE"), args...)
 	return testutil.RunPTY(t, cmd, "Delete and recover? [y/N] ", answers, "", "")
 }
 

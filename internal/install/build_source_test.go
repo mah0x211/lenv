@@ -58,9 +58,11 @@ func TestBuildSourcePreparationReportsFilesystemFailures(t *testing.T) {
 }
 
 func TestCachedArchiveReadFailureIsReported(t *testing.T) {
-	newInstallFetchFixture(t, "")
+	oldSrc := config.SrcDir
+	config.SrcDir = t.TempDir()
+	t.Cleanup(func() { config.SrcDir = oldSrc })
 	require.NoError(t, os.Mkdir(filepath.Join(config.SrcDir, "lua.tar.gz"), 0755))
-	source, err := extractCachedFile(t.TempDir(), "https://example.invalid/lua.tar.gz", config.LuaCfg, &versionmodel.VerItem{}, false)
+	source, err := extractCachedFile(t.TempDir(), "https://example.invalid/lua.tar.gz", &config.TargetConfig{Name: "lua"}, &versionmodel.VerItem{}, false)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "open cached file error")
 	require.Empty(t, source)
@@ -79,19 +81,23 @@ func TestRebuildOptionConflictStopsBeforeFetch(t *testing.T) {
 }
 
 func TestBuildSourcePaths(t *testing.T) {
-	fixture := newInstallFetchFixture(t, "")
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	oldRoot := config.LenvDir
+	config.LenvDir = root
+	t.Cleanup(func() { config.LenvDir = oldRoot })
 	for _, target := range []string{"lua", "luajit"} {
 		path, err := buildSourcePath(&config.TargetConfig{Name: target}, &versionmodel.VerItem{Ver: "5.5.1"})
 		require.NoError(t, err)
-		require.Equal(t, filepath.Join(fixture.dir, "build", target, "5.5.1"), path)
+		require.Equal(t, filepath.Join(root, "build", target, "5.5.1"), path)
 	}
 	for _, runtime := range []string{"lua/5.5.1", "luajit/v2.1"} {
-		dir := filepath.Join(fixture.dir, filepath.FromSlash(runtime))
+		dir := filepath.Join(root, filepath.FromSlash(runtime))
 		require.NoError(t, os.MkdirAll(dir, 0755))
 		cfg := &config.TargetConfig{Name: "luarocks", RootDir: filepath.Join(dir, "luarocks")}
 		path, err := buildSourcePath(cfg, &versionmodel.VerItem{Ver: "3.13.0"})
 		require.NoError(t, err)
-		require.Equal(t, filepath.Join(fixture.dir, "build", "luarocks", filepath.FromSlash(runtime), "3.13.0"), path)
+		require.Equal(t, filepath.Join(root, "build", "luarocks", filepath.FromSlash(runtime), "3.13.0"), path)
 	}
 	external := t.TempDir()
 	cfg := &config.TargetConfig{Name: "luarocks", RootDir: filepath.Join(external, "luarocks")}
@@ -102,8 +108,9 @@ func TestBuildSourcePaths(t *testing.T) {
 	second, err := buildSourcePath(cfg, &versionmodel.VerItem{Ver: "3.13.0"})
 	require.NoError(t, err)
 	require.NotEqual(t, first, second)
+	lua := &config.TargetConfig{Name: "lua"}
 	for _, version := range []string{"", ".", "../outside", "/outside", "a/b", "a\\b"} {
-		_, err := buildSourcePath(config.LuaCfg, &versionmodel.VerItem{Ver: version})
+		_, err := buildSourcePath(lua, &versionmodel.VerItem{Ver: version})
 		require.Error(t, err)
 	}
 	_, err = buildSourcePath(&config.TargetConfig{Name: "unknown"}, &versionmodel.VerItem{Ver: "1.0"})
@@ -215,6 +222,14 @@ func TestBuildSourceRejectsInvalidEnvironmentPaths(t *testing.T) {
 	_, err = prepareBuildSource(cfg, &versionmodel.VerItem{Ver: "3.13.0"}, &options{Rebuild: true})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cannot resolve Lua environment")
+
+	cfg.RootDir = filepath.Join(config.CurrentUsed, "luarocks")
+	config.LenvDir = filepath.Join(config.LenvDir, "missing")
+	_, err = prepareBuildSource(cfg, &versionmodel.VerItem{Ver: "3.13.0"}, &options{Rebuild: true})
+	require.ErrorIs(t, err, os.ErrNotExist)
+	var pathErr *os.PathError
+	require.ErrorAs(t, err, &pathErr)
+	require.Equal(t, config.LenvDir, pathErr.Path)
 }
 
 func TestBuildSourcePublicationKeepsNewlyAppearedEntry(t *testing.T) {
@@ -237,7 +252,6 @@ func TestBuildSourcePublicationKeepsNewlyAppearedEntry(t *testing.T) {
 		}
 		w.Write(data)
 	}))
-	defer server.Close()
 	config.LuaCfg.DownloadURL = server.URL + "/"
 	_, err = prepareBuildSource(config.LuaCfg, item, &options{Rebuild: true})
 	require.Error(t, err)

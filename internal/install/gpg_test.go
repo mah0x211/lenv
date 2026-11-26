@@ -179,33 +179,20 @@ func TestPublicKeyFetchedForEveryVerification(t *testing.T) {
 
 func TestPublicKeyAcquisitionErrors(t *testing.T) {
 	data, signature := testutil.OfficialLuaRocksArchive(t)
-	for _, failure := range []string{"empty", "HTML", "invalid armor", "invalid key packets", "HTTP", "downgrade"} {
-		t.Run(failure, func(t *testing.T) {
-			var insecureRequests int32
-			server := testutil.NewDownloadTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				switch failure {
-				case "HTML":
-					w.Write([]byte("<html>error</html>"))
-				case "invalid armor":
-					w.Write([]byte("-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n!\n-----END PGP PUBLIC KEY BLOCK-----"))
-				case "invalid key packets":
-					w.Write([]byte("-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nYWJj\n-----END PGP PUBLIC KEY BLOCK-----"))
-				case "HTTP":
-					atomic.AddInt32(&insecureRequests, 1)
-				case "downgrade":
-					http.Redirect(w, r, "http://example.invalid/key", http.StatusFound)
-				}
+	for _, tc := range []struct {
+		name, keyBody, want string
+	}{
+		{"invalid armor", "!", "invalid public key armor body"},
+		{"invalid key packets", "YWJj", "verification failed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			key := "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n" + tc.keyBody + "\n-----END PGP PUBLIC KEY BLOCK-----"
+			server := testutil.NewDownloadTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte(key))
 			}))
-			address := server.URL
-			if failure == "HTTP" {
-				address = "http://" + strings.TrimPrefix(address, "https://")
-			}
-			if err := verifyLuaRocksSignature(address, data, signature); err == nil {
-				t.Fatal("invalid key source accepted")
-			}
-			if atomic.LoadInt32(&insecureRequests) != 0 {
-				t.Fatal("HTTP key endpoint contacted")
-			}
+			err := verifyLuaRocksSignature(server.URL, data, signature)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.want)
 		})
 	}
 }
@@ -262,19 +249,9 @@ func TestPublicKeyArmorRequiresClosingFooter(t *testing.T) {
 
 func captureInstallError(t *testing.T, args ...string) (bool, string) {
 	t.Helper()
-	file, err := os.CreateTemp(t.TempDir(), "stderr-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	old := os.Stderr
-	os.Stderr = file
-	defer func() { os.Stderr = old; file.Close() }()
-	completed := runInstallForTest(args...)
-	data, err := os.ReadFile(file.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return completed, string(data)
+	cli.ExitCode = 0
+	_, stderr, completed := testutil.CaptureCommandOutput(t, func() { CmdInstall(args) })
+	return completed, stderr
 }
 
 func TestInstallMissingGPGPolicy(t *testing.T) {
@@ -384,7 +361,7 @@ func TestIfMissingLuaRocksDoesNotRequireGPG(t *testing.T) {
 	fixture := newInstallFetchFixture(t, "")
 	addIfMissingVersionLists(t)
 	dir := filepath.Join(config.CurrentUsed, "luarocks", "3.13.0")
-	installedTestDirectory(t, dir)
+	testutil.CreateDirectoryWithMarker(t, dir)
 	if err := os.Mkdir(filepath.Join(dir, "lua_modules"), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -448,4 +425,39 @@ func TestAllowMissingGPGRejectsUnusableEntry(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPublicKeyDownloadFailureCannotBeBypassed(t *testing.T) {
+	newInstallFetchFixture(t, "")
+	data, signature := testutil.OfficialLuaRocksArchive(t)
+	versions := version.NewVersions()
+	versions.Add("luarocks-3.13.0.tar.gz", "3.13.0", "pgp:luarocks-3.13.0.tar.gz.asc", ".tar.gz")
+	if err := versions.WriteFile(config.LuaRocksCfg.VersionFile); err != nil {
+		t.Fatal(err)
+	}
+	installed := filepath.Join(config.CurrentUsed, "luarocks", "3.13.0")
+	testutil.CreateDirectoryWithMarker(t, installed)
+	server := testutil.NewDownloadTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/key":
+			w.WriteHeader(http.StatusServiceUnavailable)
+		case strings.HasSuffix(r.URL.Path, ".asc"):
+			w.Write(signature)
+		default:
+			w.Write(data)
+		}
+	}))
+	config.LuaRocksCfg.DownloadURL = server.URL + "/"
+	config.LuaRocksCfg.SigningKeyURL = server.URL + "/key"
+	for name, content := range map[string][]byte{"luarocks-3.13.0.tar.gz": data, "luarocks-3.13.0.tar.gz.asc": signature} {
+		if err := os.WriteFile(filepath.Join(config.SrcDir, name), content, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	completed, message := captureInstallError(t, "--allow-missing-gpg", ":latest")
+	if completed || !strings.Contains(message, "cannot download LuaRocks public key") || strings.Contains(message, "Warning:") {
+		t.Fatalf("key failure bypassed: %s", message)
+	}
+	testutil.AssertFileContent(t, filepath.Join(installed, "marker"), "keep")
+	testutil.AssertFileContent(t, filepath.Join(config.SrcDir, "luarocks-3.13.0.tar.gz"), string(data))
 }

@@ -32,14 +32,18 @@ func TestCurrentCommandSelections(t *testing.T) {
 		{"missing rocks", "luarocks", "no rocks", "\n"},
 		{"no runtime selected", "", "no runtime", "\n"},
 		{"no runtime target", "lua", "no runtime", "\n"},
+		{"dangling runtime link", "lua", "dangling runtime", "\n"},
 		{"no rocks runtime", "luarocks", "no runtime", "\n"},
 		{"regular modules file", "luarocks", "file", "\n"},
 		{"dangling modules link", "luarocks", "dangling", "\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			currentDir, modules := currentSelection(t)
-			if tc.state == "no runtime" {
+			if tc.state == "no runtime" || tc.state == "dangling runtime" {
 				require.NoError(t, os.Remove(currentDir))
+				if tc.state == "dangling runtime" {
+					require.NoError(t, os.Symlink("lua/missing", currentDir))
+				}
 			} else if tc.state != "" {
 				require.NoError(t, os.Remove(modules))
 				if tc.state == "file" {
@@ -62,16 +66,25 @@ func TestCurrentCommandSelections(t *testing.T) {
 	}
 }
 
-func TestCurrentCommandRejectsModulesLinkLoop(t *testing.T) {
-	currentDir, modules := currentSelection(t)
-	require.NoError(t, os.Remove(modules))
-	require.NoError(t, os.Symlink("lua_modules", modules))
-	cli.ExitCode = 0
-	_, stderr, completed := testutil.CaptureCommandOutput(t, func() { CmdCurrent(currentDir, []string{"luarocks"}) })
-	require.False(t, completed)
-	require.Equal(t, 1, cli.ExitCode, stderr)
-	require.Contains(t, stderr, "failed to EvalSymlink()")
-	link, err := os.Readlink(modules)
-	require.NoError(t, err)
-	require.Equal(t, "lua_modules", link)
+func TestCurrentCommandRejectsLinkLoop(t *testing.T) {
+	for _, target := range []string{"lua", "luarocks"} {
+		t.Run(target, func(t *testing.T) {
+			currentDir, modules := currentSelection(t)
+			path := currentDir
+			if target == "luarocks" {
+				path = modules
+			}
+			name := filepath.Base(path)
+			require.NoError(t, os.Remove(path))
+			require.NoError(t, os.Symlink(name, path))
+			cli.ExitCode = 0
+			_, stderr, completed := testutil.CaptureCommandOutput(t, func() { CmdCurrent(currentDir, []string{target}) })
+			require.False(t, completed)
+			require.Equal(t, 1, cli.ExitCode, stderr)
+			require.Contains(t, stderr, "failed to EvalSymlink()")
+			link, err := os.Readlink(path)
+			require.NoError(t, err)
+			require.Equal(t, name, link)
+		})
+	}
 }

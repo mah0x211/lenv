@@ -9,6 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestInitGlobalVarsRejectsUnknownDirectoryMode(t *testing.T) {
+	oldCWD := CWD
+	t.Cleanup(func() { CWD = oldCWD })
+	require.PanicsWithValue(t, "unknown basedir: unknown", func() { InitGlobalVars("unknown") })
+}
+
 func TestRecoveryPreservesAutomaticDiscovery(t *testing.T) {
 	for _, kind := range []string{"file", "link", "dangling"} {
 		t.Run(kind, func(t *testing.T) {

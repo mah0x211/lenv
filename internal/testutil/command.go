@@ -1,9 +1,12 @@
 package testutil
 
 import (
+	"bytes"
 	"io"
 	"os"
+	"os/exec"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/mah0x211/lenv/internal/cli"
@@ -85,4 +88,23 @@ func CaptureHelpExit(t testing.TB, command func()) (string, int) {
 		t.Fatalf("command did not exit through help: %s", output)
 	}
 	return output, code
+}
+
+func SourcePathSettings(t testing.TB, shell, file, inherited string) []string {
+	t.Helper()
+	cmd := exec.Command(shell, "-c", `. "$1"; printf '%s\000%s\000%s\000' "$PATH" "$LUA_PATH" "$LUA_CPATH"`, "path-settings", file)
+	// The inherited values deliberately differ from the generating process.
+	// Quoted expansions must preserve them without interpreting their contents.
+	cmd.Env = []string{"PATH=" + inherited, "LUA_PATH=previous", "LUA_CPATH=previous"}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	data, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("source settings with %s: %v\n%s", shell, err, stderr.String())
+	}
+	values := strings.Split(string(data), "\x00")
+	if len(values) != 4 || values[3] != "" {
+		t.Fatalf("invalid environment output: %q", data)
+	}
+	return values[:3]
 }

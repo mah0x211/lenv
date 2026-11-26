@@ -14,26 +14,7 @@ import (
 
 func newUninstallProject(t *testing.T) string {
 	t.Helper()
-	root := filepath.Join(t.TempDir(), ".lenv")
-	for _, name := range []string{"src", "lua/5.4.8", "lua/5.5.1", "luajit/v2.1"} {
-		require.NoError(t, os.MkdirAll(filepath.Join(root, name), 0755))
-	}
-	lua, jit, rocks := version.NewVersions(), version.NewVersions(), version.NewVersions()
-	for _, item := range []string{"5.4.8", "5.5.1"} {
-		lua.Add("lua-"+item+".tar.gz", item, "", ".tar.gz")
-		require.NoError(t, os.WriteFile(filepath.Join(root, "lua", item, "marker"), []byte(item), 0600))
-	}
-	jit.AddBranch("v2.1", "origin")
-	for _, item := range []string{"3.12.2", "3.13.0"} {
-		rocks.Add("luarocks-"+item+".tar.gz", item, "", ".tar.gz")
-		dir := filepath.Join(root, "lua/5.4.8/luarocks", item, "lua_modules")
-		require.NoError(t, os.MkdirAll(dir, 0755))
-	}
-	for name, versions := range map[string]*version.Versions{"lua": lua, "luajit": jit, "luarocks": rocks} {
-		require.NoError(t, versions.WriteFile(filepath.Join(root, name+"_vers.txt")))
-	}
-	require.NoError(t, os.Symlink("lua/5.4.8", filepath.Join(root, "current")))
-	require.NoError(t, os.Symlink("luarocks/3.12.2/lua_modules", filepath.Join(root, "lua/5.4.8/lua_modules")))
+	root := testutil.NewInstalledProject(t)
 
 	oldRoot, oldCurrent, oldUsed := config.LenvDir, config.CurrentDir, config.CurrentUsed
 	oldLua, oldJit, oldRocks, oldExit := config.LuaCfg, config.LuaJitCfg, config.LuaRocksCfg, cli.ExitCode
@@ -210,4 +191,161 @@ func TestUninstallCommandReportsInaccessibleVersionDirectory(t *testing.T) {
 	require.Equal(t, "lua/5.4.8", current)
 	require.NoError(t, os.Chmod(blocked, 0755))
 	require.DirExists(t, filepath.Join(blocked, "v2.1"))
+}
+
+var uninstallSelectionCases = []struct {
+	name, selected string
+}{
+	{"selected target", "3.0.1"},
+	{"selected prerelease", "3.0.1-rc2"},
+	{"selected longer patch", "3.0.10"},
+	{"selected unrelated", "3.1.0"},
+	{"no selection", ""},
+}
+
+type uninstallSelectionFixture struct {
+	current, rocks, modules, versionFile string
+	selected                             string
+	selectionInfo                        os.FileInfo
+}
+
+func newUninstallSelectionFixture(t *testing.T, selected string) *uninstallSelectionFixture {
+	t.Helper()
+	project, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(project, ".lenv")
+	fixture := &uninstallSelectionFixture{
+		current:     filepath.Join(root, "current"),
+		rocks:       filepath.Join(root, "lua/5.5.1/luarocks"),
+		versionFile: filepath.Join(root, "luarocks_vers.txt"), selected: selected,
+	}
+	for _, name := range []string{"src", "luajit"} {
+		if err := os.MkdirAll(filepath.Join(root, name), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	versions := version.NewVersions()
+	for _, version := range []string{"3.0.1", "3.0.1-rc2", "3.0.10", "3.1.0"} {
+		dir := filepath.Join(fixture.rocks, version, "lua_modules")
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "marker"), []byte(version), 0600); err != nil {
+			t.Fatal(err)
+		}
+		versions.Add("luarocks-"+version+".tar.gz", version, "", ".tar.gz")
+	}
+	if err := versions.WriteFile(fixture.versionFile); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("lua/5.5.1", fixture.current); err != nil {
+		t.Fatal(err)
+	}
+	fixture.modules = filepath.Join(fixture.current, "lua_modules")
+	if selected != "" {
+		if err := os.Symlink(filepath.Join("luarocks", selected, "lua_modules"), fixture.modules); err != nil {
+			t.Fatal(err)
+		}
+		fixture.selectionInfo, err = os.Lstat(fixture.modules)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	oldRocks, oldCurrent, oldExit := config.LuaRocksCfg, config.CurrentDir, cli.ExitCode
+	t.Cleanup(func() { config.LuaRocksCfg, config.CurrentDir, cli.ExitCode = oldRocks, oldCurrent, oldExit })
+	config.LuaRocksCfg = &config.TargetConfig{Name: "luarocks", RootDir: fixture.rocks, VersionFile: fixture.versionFile}
+	config.CurrentDir, cli.ExitCode = fixture.current, 0
+	return fixture
+}
+
+func (f *uninstallSelectionFixture) assertAfterUninstall(t *testing.T) {
+	t.Helper()
+	if _, err := os.Lstat(filepath.Join(f.rocks, "3.0.1")); !os.IsNotExist(err) {
+		t.Fatalf("target version was not removed: %v", err)
+	}
+	for _, version := range []string{"3.0.1-rc2", "3.0.10", "3.1.0"} {
+		data, err := os.ReadFile(filepath.Join(f.rocks, version, "lua_modules/marker"))
+		if err != nil || string(data) != version {
+			t.Fatalf("sibling %s changed: %q, %v", version, data, err)
+		}
+	}
+	lua, err := os.Readlink(f.current)
+	if err != nil || lua != "lua/5.5.1" {
+		t.Fatalf("Lua selection changed: %q, %v", lua, err)
+	}
+	if f.selected == "" || f.selected == "3.0.1" {
+		if _, err := os.Lstat(f.modules); !os.IsNotExist(err) {
+			t.Fatalf("unexpected remaining selection: %v", err)
+		}
+		return
+	}
+	target, err := os.Readlink(f.modules)
+	want := filepath.Join("luarocks", f.selected, "lua_modules")
+	if err != nil || target != want {
+		t.Fatalf("selection = %q, %v; want %q", target, err, want)
+	}
+	info, err := os.Lstat(f.modules)
+	if err != nil || !os.SameFile(f.selectionInfo, info) {
+		t.Fatalf("unrelated selection link was replaced: %v", err)
+	}
+}
+
+func TestUninstallLuaRocksPreservesOtherSelection(t *testing.T) {
+	for _, tc := range uninstallSelectionCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := newUninstallSelectionFixture(t, tc.selected)
+			done := make(chan struct{})
+			completed := false
+			go func() {
+				defer close(done)
+				CmdUninstall([]string{":3.0.1"})
+				completed = true
+			}()
+			<-done
+			if !completed || cli.ExitCode != 0 {
+				t.Fatalf("uninstall completed = %v, exit code = %d", completed, cli.ExitCode)
+			}
+			fixture.assertAfterUninstall(t)
+		})
+	}
+}
+
+func TestUninstallLuaRocksSelectionAtVersionRoot(t *testing.T) {
+	fixture := newUninstallSelectionFixture(t, "3.0.1")
+	if err := os.Remove(fixture.modules); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("luarocks/3.0.1", fixture.modules); err != nil {
+		t.Fatal(err)
+	}
+	_, stderr, completed := runUninstallCommand(t, ":3.0.1")
+	if !completed || cli.ExitCode != 0 {
+		t.Fatalf("uninstall completed = %v, exit code = %d\n%s", completed, cli.ExitCode, stderr)
+	}
+	fixture.assertAfterUninstall(t)
+}
+
+func TestUninstallLuaRocksReportsSelectionRemovalFailure(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("directory permissions require an unprivileged user")
+	}
+	fixture := newUninstallSelectionFixture(t, "3.0.1")
+	// The runtime directory holds the link, while its luarocks subdirectory holds the version.
+	runtime := filepath.Dir(fixture.rocks)
+	require.NoError(t, os.Chmod(runtime, 0555))
+	t.Cleanup(func() { require.NoError(t, os.Chmod(runtime, 0755)) })
+
+	_, stderr, completed := runUninstallCommand(t, ":3.0.1")
+	require.False(t, completed)
+	require.Equal(t, 1, cli.ExitCode, stderr)
+	require.Contains(t, stderr, "failed to remove symlink")
+	require.Contains(t, stderr, fixture.modules)
+	_, err := os.Lstat(filepath.Join(fixture.rocks, "3.0.1"))
+	require.True(t, os.IsNotExist(err), "target version was not removed: %v", err)
+	testutil.AssertFileContent(t, filepath.Join(fixture.rocks, "3.0.10/lua_modules/marker"), "3.0.10")
+	link, err := os.Readlink(fixture.modules)
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join("luarocks", "3.0.1", "lua_modules"), link)
 }

@@ -1,9 +1,7 @@
 package path
 
 import (
-	"bytes"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -24,25 +22,6 @@ func pathSettingsOutput(t *testing.T, args ...string) string {
 		t.Fatal(err)
 	}
 	return string(data)
-}
-
-func sourcePathSettings(t *testing.T, shell, file, inherited string) []string {
-	t.Helper()
-	cmd := exec.Command(shell, "-c", `. "$1"; printf '%s\000%s\000%s\000' "$PATH" "$LUA_PATH" "$LUA_CPATH"`, "path-settings", file)
-	// The inherited values deliberately differ from the generating process.
-	// Quoted expansions must preserve them without interpreting their contents.
-	cmd.Env = []string{"PATH=" + inherited, "LUA_PATH=previous", "LUA_CPATH=previous"}
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	data, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("source settings with %s: %v\n%s", shell, err, stderr.String())
-	}
-	values := strings.Split(string(data), "\x00")
-	if len(values) != 4 || values[3] != "" {
-		t.Fatalf("invalid environment output: %q", data)
-	}
-	return values[:3]
 }
 
 func assertLuaSettings(t *testing.T, got, prefix string, suffixes []string) {
@@ -93,7 +72,7 @@ func TestPathShellSettingsPreserveLiteralValues(t *testing.T) {
 			}
 			for _, shell := range []string{"/bin/sh", "/bin/bash"} {
 				for _, inherited := range []string{"", `/inherited path:$HOME:$(printf changed):` + "`printf changed`"} {
-					values := sourcePathSettings(t, shell, rc, inherited)
+					values := testutil.SourcePathSettings(t, shell, rc, inherited)
 					want := filepath.Join(config.CurrentDir, "bin") + ":" + filepath.Join(config.CurrentDir, "lua_modules/bin") + ":" + inherited
 					if values[0] != want {
 						t.Errorf("%s PATH = %q; want %q", shell, values[0], want)
@@ -137,7 +116,7 @@ func TestPathOutputWithoutLua(t *testing.T) {
 	}
 	rc := filepath.Join(t.TempDir(), "lenvrc")
 	require.NoError(t, os.WriteFile(rc, []byte(pathSettingsOutput(t)), 0600))
-	values := sourcePathSettings(t, "/bin/sh", rc, "/inherited/bin")
+	values := testutil.SourcePathSettings(t, "/bin/sh", rc, "/inherited/bin")
 	require.Equal(t, []string{expected["bin"] + ":/inherited/bin", expected["lualib"], expected["luaclib"]}, values)
 	require.NotContains(t, strings.Join(values, "\n"), "unexpected")
 }

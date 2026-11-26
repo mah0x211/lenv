@@ -16,26 +16,7 @@ import (
 func newUseProject(t *testing.T) string {
 	t.Helper()
 	testutil.PreserveWorkingDirectory(t)
-	root := filepath.Join(t.TempDir(), ".lenv")
-	for _, name := range []string{"src", "lua/5.4.8", "lua/5.5.1", "luajit/v2.1"} {
-		require.NoError(t, os.MkdirAll(filepath.Join(root, name), 0755))
-	}
-	lua, jit, rocks := version.NewVersions(), version.NewVersions(), version.NewVersions()
-	for _, item := range []string{"5.4.8", "5.5.1"} {
-		lua.Add("lua-"+item+".tar.gz", item, "", ".tar.gz")
-		require.NoError(t, os.WriteFile(filepath.Join(root, "lua", item, "marker"), []byte(item), 0600))
-	}
-	jit.AddBranch("v2.1", "origin")
-	for _, item := range []string{"3.12.2", "3.13.0"} {
-		rocks.Add("luarocks-"+item+".tar.gz", item, "", ".tar.gz")
-		dir := filepath.Join(root, "lua/5.4.8/luarocks", item, "lua_modules")
-		require.NoError(t, os.MkdirAll(dir, 0755))
-	}
-	for name, versions := range map[string]*version.Versions{"lua": lua, "luajit": jit, "luarocks": rocks} {
-		require.NoError(t, versions.WriteFile(filepath.Join(root, name+"_vers.txt")))
-	}
-	require.NoError(t, os.Symlink("lua/5.4.8", filepath.Join(root, "current")))
-	require.NoError(t, os.Symlink("luarocks/3.12.2/lua_modules", filepath.Join(root, "lua/5.4.8/lua_modules")))
+	root := testutil.NewInstalledProject(t)
 
 	wd, err := os.Getwd()
 	require.NoError(t, err)

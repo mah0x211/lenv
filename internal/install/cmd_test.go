@@ -2,6 +2,7 @@ package install
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/mah0x211/lenv/internal/cli"
 	"github.com/mah0x211/lenv/internal/config"
+	"github.com/mah0x211/lenv/internal/env"
 	"github.com/mah0x211/lenv/internal/testutil"
 	version "github.com/mah0x211/lenv/internal/versions"
 	"github.com/stretchr/testify/require"
@@ -47,6 +49,60 @@ func TestParseInstallOptions(t *testing.T) {
 			require.Equal(t, tc.version, options.Version)
 			require.Equal(t, tc.build, options.Build)
 		})
+	}
+}
+
+func TestParseIfMissingOptions(t *testing.T) {
+	for _, args := range [][]string{
+		{"--if-missing", "5.5.1", "linux"},
+		{"--fetch", "--if-missing", "5.5.1", "linux"},
+		{"--if-missing", "--fetch", "5.5.1", "linux"},
+	} {
+		options, err := parseInstallOptions(args)
+		require.NoError(t, err)
+		require.True(t, options.IfMissing)
+		require.Equal(t, "5.5.1", options.Version)
+		require.Equal(t, []string{"linux"}, options.Build)
+		require.Equal(t, len(args) == 4, options.Fetch)
+	}
+	options, err := parseInstallOptions([]string{"5.5.1", "--if-missing", "linux"})
+	require.NoError(t, err)
+	require.False(t, options.IfMissing)
+	require.Equal(t, []string{"--if-missing", "linux"}, options.Build)
+}
+
+func TestParseRebuildOptions(t *testing.T) {
+	for _, flag := range []string{"--rebuild", "--no-rebuild"} {
+		options, err := parseInstallOptions([]string{"--fetch", flag, "--if-missing", "--allow-missing-gpg", "5.5.1", "linux"})
+		require.NoError(t, err)
+		require.Equal(t, flag == "--rebuild", options.Rebuild)
+		require.Equal(t, flag == "--no-rebuild", options.NoRebuild)
+		require.True(t, options.Fetch && options.IfMissing && options.AllowMissingGPG)
+		require.Equal(t, []string{"linux"}, options.Build)
+		options, err = parseInstallOptions([]string{"5.5.1", flag})
+		require.NoError(t, err)
+		require.False(t, options.Rebuild || options.NoRebuild)
+		require.Equal(t, []string{flag}, options.Build)
+	}
+}
+
+func TestParseAllowMissingGPG(t *testing.T) {
+	for _, args := range [][]string{
+		{"--allow-missing-gpg", ":latest"},
+		{"--allow-missing-gpg", "--fetch", "--if-missing", "5.5.:latest"},
+		{"--if-missing", "--fetch", "--allow-missing-gpg", "5.5.:latest"},
+	} {
+		opts, err := parseInstallOptions(args)
+		if err != nil || !opts.AllowMissingGPG {
+			t.Fatalf("parse %q: %v, %v", args, opts, err)
+		}
+		if len(args) == 4 && (!opts.Fetch || !opts.IfMissing) {
+			t.Fatal("combined flags lost")
+		}
+	}
+	opts, err := parseInstallOptions([]string{"latest", "--allow-missing-gpg"})
+	if err != nil || opts.AllowMissingGPG || len(opts.Build) != 1 {
+		t.Fatalf("build argument: %v, %v", opts, err)
 	}
 }
 
@@ -97,7 +153,6 @@ func newInstallFetchFixture(t *testing.T, failure string) *installFetchFixture {
 			w.WriteHeader(503)
 		}
 	}))
-	t.Cleanup(server.Close)
 	if failure == "connection" {
 		server.Close()
 	}
@@ -178,6 +233,28 @@ func TestInstallFetchFailureStopsBeforeInstalling(t *testing.T) {
 			require.Equal(t, "installed", string(data))
 		})
 	}
+}
+
+func TestInstallLuaRocksStopsWhenCurrentCannotBeResolved(t *testing.T) {
+	fixture := newInstallFetchFixture(t, "")
+	rocks := version.NewVersions()
+	require.True(t, rocks.Add("luarocks-3.13.0.tar.gz", "3.13.0", "", ".tar.gz"))
+	require.NoError(t, rocks.WriteFile(config.LuaRocksCfg.VersionFile))
+	require.NoError(t, os.Remove(config.CurrentDir))
+	require.NoError(t, os.WriteFile(config.CurrentDir, []byte("keep"), 0600))
+
+	oldRecovery := env.StartupRecovery
+	t.Cleanup(func() { env.StartupRecovery = oldRecovery })
+	env.StartupRecovery = env.NewRecoverySession(os.Stdin, io.Discard)
+
+	_, stderr, completed := testutil.CaptureCommandOutput(t, func() { CmdInstall([]string{":3.13.0"}) })
+	require.False(t, completed)
+	require.Contains(t, stderr, "recovery cancelled")
+	require.Equal(t, 1, cli.ExitCode)
+	require.Zero(t, atomic.LoadInt32(&fixture.requests))
+	data, err := os.ReadFile(config.CurrentDir)
+	require.NoError(t, err)
+	require.Equal(t, "keep", string(data))
 }
 
 func TestPrepareInstallInvalidArguments(t *testing.T) {

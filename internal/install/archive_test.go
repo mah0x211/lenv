@@ -333,17 +333,7 @@ func TestVerifyLuaRocksOfficialArchive(t *testing.T) {
 }
 
 func TestVerifyLuaRocksRejectsOtherSigner(t *testing.T) {
-	var signature []byte
-	var err error
-	for _, name := range []string{"testdata/untrusted-signature.asc", "../testdata/untrusted-signature.asc"} {
-		signature, err = os.ReadFile(name)
-		if err == nil {
-			break
-		}
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
+	signature := testutil.UntrustedSignature(t)
 	item := &version.VerItem{Name: "rocks.tar.gz", Sum: "pgp:rocks.tar.gz.asc"}
 	if err := verify(&config.TargetConfig{Name: "luarocks", SigningKeyURL: testutil.PublisherKeyURL(t)}, item, []byte("archive"), signature); err == nil {
 		t.Fatal("accepted an untrusted signing key")

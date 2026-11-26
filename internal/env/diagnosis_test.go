@@ -7,30 +7,15 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/mah0x211/lenv/internal/cli"
 	"github.com/mah0x211/lenv/internal/config"
 	"github.com/mah0x211/lenv/internal/fs"
+	"github.com/mah0x211/lenv/internal/testutil/recovery"
 	"github.com/stretchr/testify/require"
 )
 
-func recoveryDiagnosisProject(t *testing.T, project string) {
-	t.Helper()
-	oldRoot, oldSrc, oldCurrent, oldUsed := config.LenvDir, config.SrcDir, config.CurrentDir, config.CurrentUsed
-	oldLua, oldJit, oldRocks, oldExit := config.LuaCfg, config.LuaJitCfg, config.LuaRocksCfg, cli.ExitCode
-	t.Cleanup(func() {
-		config.LenvDir, config.SrcDir, config.CurrentDir, config.CurrentUsed = oldRoot, oldSrc, oldCurrent, oldUsed
-		config.LuaCfg, config.LuaJitCfg, config.LuaRocksCfg, cli.ExitCode = oldLua, oldJit, oldRocks, oldExit
-	})
-	config.LenvDir = filepath.Join(project, ".lenv")
-	config.SrcDir, config.CurrentDir = filepath.Join(config.LenvDir, "src"), filepath.Join(config.LenvDir, "current")
-	config.LuaCfg = &config.TargetConfig{RootDir: filepath.Join(config.LenvDir, "lua")}
-	config.LuaJitCfg = &config.TargetConfig{RootDir: filepath.Join(config.LenvDir, "luajit")}
-	config.LuaRocksCfg = &config.TargetConfig{}
-}
-
 func TestRecoveryDiagnosisDoesNotCreateDirectories(t *testing.T) {
 	project := t.TempDir()
-	recoveryDiagnosisProject(t, project)
+	recovery.ConfigureProject(t, project)
 	diagnosis := DiagnoseStartup()
 	require.NoError(t, diagnosis.Err)
 	require.False(t, diagnosis.Ready())
@@ -56,7 +41,7 @@ func TestStartupDiagnosisIsReadOnly(t *testing.T) {
 		t.Run(kind, func(t *testing.T) {
 			project, err := filepath.EvalSymlinks(t.TempDir())
 			require.NoError(t, err)
-			recoveryDiagnosisProject(t, project)
+			recovery.ConfigureProject(t, project)
 			for _, path := range []string{config.SrcDir, filepath.Join(config.LuaCfg.RootDir, "5.4"), config.LuaJitCfg.RootDir} {
 				require.NoError(t, os.MkdirAll(path, 0755))
 			}
@@ -114,7 +99,7 @@ func TestStartupDiagnosisReportsMissingAndConflictingDirectories(t *testing.T) {
 	for _, kind := range []string{"missing", "file", "link"} {
 		t.Run(kind, func(t *testing.T) {
 			project := t.TempDir()
-			recoveryDiagnosisProject(t, project)
+			recovery.ConfigureProject(t, project)
 			target := filepath.Join(project, "target")
 			require.NoError(t, os.Mkdir(target, 0755))
 			require.NoError(t, os.MkdirAll(config.LuaCfg.RootDir, 0755))
@@ -145,7 +130,7 @@ func TestStartupDiagnosisReportsMissingAndConflictingDirectories(t *testing.T) {
 }
 
 func TestRecoveryDiagnosisReportsSpecialFile(t *testing.T) {
-	recoveryDiagnosisProject(t, t.TempDir())
+	recovery.ConfigureProject(t, t.TempDir())
 	for _, dir := range []string{config.SrcDir, config.LuaCfg.RootDir, config.LuaJitCfg.RootDir} {
 		require.NoError(t, os.MkdirAll(dir, 0755))
 	}
@@ -168,7 +153,7 @@ func TestRecoveryDiagnosisReportsInaccessibleEnvironment(t *testing.T) {
 	}
 	project, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
-	recoveryDiagnosisProject(t, project)
+	recovery.ConfigureProject(t, project)
 	require.NoError(t, os.MkdirAll(config.LuaJitCfg.RootDir, 0755))
 	require.NoError(t, os.Chmod(config.LenvDir, 0))
 	t.Cleanup(func() { require.NoError(t, os.Chmod(config.LenvDir, 0755)) })

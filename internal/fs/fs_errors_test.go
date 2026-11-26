@@ -35,6 +35,16 @@ func TestFilesystemHelpersReportInvalidPaths(t *testing.T) {
 	require.NoError(t, os.MkdirAll(path, 0755), "failure must not leave an obstructing child")
 }
 
+func TestCreateSymlinkKeepsPreviousLinkOnInvalidTarget(t *testing.T) {
+	link := filepath.Join(t.TempDir(), "current")
+	require.NoError(t, os.Symlink("previous", link))
+
+	require.Error(t, CreateSymlink("invalid\x00target", link))
+	target, err := os.Readlink(link)
+	require.NoError(t, err)
+	require.Equal(t, "previous", target)
+}
+
 func TestWriteFileRemovesPartialOutputAfterReadError(t *testing.T) {
 	root := t.TempDir()
 	source, err := os.Open(root)

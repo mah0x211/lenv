@@ -25,7 +25,6 @@ func TestArchiveExtractionCacheRetryIsIsolated(t *testing.T) {
 		requests++
 		_, _ = w.Write(valid)
 	}))
-	defer server.Close()
 	url := server.URL + "/source.tar.gz"
 	cache := filepath.Join(config.SrcDir, "source.tar.gz")
 	bad := testutil.ArchiveData(t,

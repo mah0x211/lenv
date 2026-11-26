@@ -2,7 +2,10 @@ package testutil
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func AssertFileContent(t testing.TB, name, want string) {
@@ -32,4 +35,10 @@ func PreserveWorkingDirectory(t testing.TB) {
 			t.Error(err)
 		}
 	})
+}
+
+func CreateDirectoryWithMarker(t testing.TB, path string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(path, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(path, "marker"), []byte("keep"), 0600))
 }
